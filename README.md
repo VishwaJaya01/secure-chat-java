@@ -1,221 +1,173 @@
-Secure Chat (Java) — README
+# Secure Chat (Java)
 
-A single-repo, Java-first implementation of a secure multi-client chat system.
-Includes raw socket servers (TCP, NIO, TLS), a Spring Boot + Thymeleaf web UI, optional H2 persistence, and (optional) UDP presence.
+Secure Chat is a Java 17, Maven-driven workspace that demonstrates multiple transport strategies (blocking TCP, NIO, TLS) alongside a Spring Boot + Thymeleaf web interface. Each module is intentionally lightweight so the system can be extended for coursework, demos, or experimentation with secure real-time messaging.
 
-🚀 Features at a glance
+---
 
-TCP chat server (blocking I/O)
+## Key Capabilities
+- Blocking TCP server with multithreaded client handling.
+- Non-blocking gateway using Java NIO selectors.
+- TLS/SSL transport via JSSE with keystore/truststore wiring.
+- Spring Boot web UI with Thymeleaf templates and SSE stream.
+- In-memory persistence today, with H2 + Flyway scaffolding ready.
+- Optional UDP presence broadcaster/listener for beaconing status.
 
-Multithreaded client handling (ExecutorService)
+---
 
-NIO gateway (Selector, non-blocking)
+## Module Overview
+| Module | Role | Notes |
+|--------|------|-------|
+| `chat-core` | Shared models & registries | `Message`, `BroadcastHub`, `UserRegistry` |
+| `chat-tcp` | Blocking socket server/client | Simple CLI harness for testing |
+| `chat-nio` | Selector-based gateway | Entry point for non-blocking experimentation |
+| `chat-secure` | TLS socket server/client | Demonstrates keystore & truststore usage |
+| `udp-presence` | UDP beacon services | Optional presence broadcast/receive |
+| `web-app` | Spring Boot 3 UI | Thymeleaf views, SSE feed, H2-ready wiring |
 
-TLS/SSL secure chat (JSSE, keystore/truststore)
+---
 
-Spring Boot web UI (Thymeleaf, SSE live feed)
-
-H2 database (optional; message history)
-
-(Optional) UDP presence (online/idle/offline)
-
-📦 Repo layout
+## Project Layout
+```
 secure-chat-java/
-├─ chat-core/         # Shared model & hubs (Message, BroadcastHub, UserRegistry)
-├─ chat-tcp/          # Blocking TCP server + CLI client
-├─ chat-nio/          # NIO non-blocking gateway (Selector)
-├─ chat-secure/       # TLS/SSL servers & clients
-├─ udp-presence/      # (optional) UDP presence beacons
-├─ web-app/           # Spring Boot + Thymeleaf UI (+ H2 via profile)
-├─ certs/             # Keystore/truststore (placeholders)
-├─ db/                # Flyway SQL migrations & seeds (for H2)
-├─ scripts/           # Helper scripts (run, gen-certs, load test)
-├─ report/, docs/, assets/
-├─ pom.xml            # Parent Maven (aggregator)
+├─ chat-core/            # Domain primitives and registries
+├─ chat-tcp/             # Blocking TCP server & CLI client
+├─ chat-nio/             # Non-blocking gateway placeholder
+├─ chat-secure/          # TLS-enabled chat components
+├─ udp-presence/         # Optional UDP beacons
+├─ web-app/              # Spring Boot web interface
+├─ certs/                # Keystore/truststore placeholders
+├─ db/                   # Flyway SQL migrations (H2 scaffold)
+├─ scripts/              # Helper launch scripts
+├─ pom.xml               # Maven parent (aggregator)
 └─ .gitignore
+```
 
-✅ Prerequisites
+---
 
-Java 17+
+## Prerequisites
+- Java 17 or newer (set `JAVA_HOME` accordingly).
+- Maven 3.9+ (or use the bundled `./mvnw` wrapper).
+- `keytool` for generating local TLS assets (ships with the JDK).
+- Optional tooling: `curl` for quick checks, Wireshark for TLS demos.
 
-Maven 3.9+ (or use ./mvnw if wrapper added)
+---
 
-(Optional) Wireshark (to show TLS encryption)
-
-(Optional) curl (for quick HTTP checks)
-
-🔧 First-time setup
-
-Clone
-
+## Quick Start
+```bash
 git clone <your-repo-url> secure-chat-java
 cd secure-chat-java
+./mvnw clean install
+```
 
+This builds every module, runs unit tests, and installs artifacts to your local Maven cache.
 
-Build all modules
+---
 
-mvn -q -DskipTests clean install
+## Running Components
 
+### Spring Boot Web UI (in-memory)
+```bash
+./scripts/run-web.sh
+# Visit http://localhost:8080
+```
+Messages are stored in-memory and published to the `/stream` SSE endpoint.
 
-Create TLS materials (self-signed)
+### Blocking TCP Server
+```bash
+./scripts/run-plain.sh          # defaults to port 9000
+# In a second terminal
+./mvnw -pl chat-tcp -am exec:java \
+  -Dexec.mainClass=com.securechat.tcp.ChatCli \
+  -Dexec.args="localhost 9000 alice"
+```
 
-If scripts/gen-certs.sh is present, use it; otherwise:
+### NIO Gateway
+```bash
+./mvnw -pl chat-nio -am exec:java \
+  -Dexec.mainClass=com.securechat.nio.NioChatGateway \
+  -Dexec.args="5001"
+```
 
-# Server keystore (PKCS12)
-keytool -genkeypair -alias server -keyalg RSA -keysize 2048 \
-  -dname "CN=localhost, OU=Dev, O=SecureChat, L=Colombo, S=WP, C=LK" \
-  -validity 365 -storetype PKCS12 -keystore certs/server.p12 -storepass changeit
+### TLS Chat Server & Client
+1. Place keystore/truststore files in `certs/` (see below).
+2. Start the server:
+   ```bash
+   ./scripts/run-tls.sh
+   ```
+3. Connect a client:
+   ```bash
+   ./mvnw -pl chat-secure -am exec:java \
+     -Dexec.mainClass=com.securechat.secure.SecureChatCli \
+     -Dexec.args="localhost 5443"
+   ```
 
-# Client truststore that trusts the server cert
-keytool -exportcert -keystore certs/server.p12 -alias server -storepass changeit -rfc > certs/server.crt
-keytool -importcert -file certs/server.crt -alias server \
+### UDP Presence (optional)
+```bash
+./mvnw -pl udp-presence -am exec:java \
+  -Dexec.mainClass=com.securechat.udp.PresenceServer -Dexec.args="9090"
+./mvnw -pl udp-presence -am exec:java \
+  -Dexec.mainClass=com.securechat.udp.PresenceClient -Dexec.args="9090"
+```
+
+---
+
+## TLS Assets
+Place certificates under `certs/`. For local testing, a minimal `keytool` workflow is:
+
+```bash
+keytool -genkeypair -alias secure-chat-server -keyalg RSA -keysize 2048 \
+  -dname "CN=localhost, OU=Dev, O=SecureChat, L=Colombo, S=Western, C=LK" \
+  -validity 365 -storetype PKCS12 \
+  -keystore certs/server.p12 -storepass changeit
+
+keytool -exportcert -alias secure-chat-server -keystore certs/server.p12 \
+  -storepass changeit -rfc > certs/server.crt
+
+keytool -importcert -alias secure-chat-server -file certs/server.crt \
   -keystore certs/truststore.p12 -storetype PKCS12 -storepass changeit -noprompt
+```
 
+> ⚠️ Never commit real certificates or credentials. Replace `changeit` with secure values in production.
 
-Keep keystore passwords out of Git. The defaults below use changeit for local demo only.
+---
 
-🔌 Ports (defaults)
-Component	Port
-Web UI (HTTP)	8080
-TCP Server (blocking)	5000
-NIO Gateway	5001
-TLS Server	5443
-UDP Presence (optional)	9090
-▶️ How to run (common modes)
-A) Web UI (no DB, in-memory) — recommended for quick demo
-cd web-app
-mvn spring-boot:run
-# open http://localhost:8080
+## Common Port Map
+| Service | Port | Notes |
+|---------|------|-------|
+| Spring Boot web UI | 8080 | HTTP + SSE stream |
+| TCP server | 9000 | Blocking sockets (`run-plain.sh`) |
+| NIO gateway | 5001 | Selector-driven placeholder |
+| TLS server | 5443 | Requires keystore in `certs/` |
+| UDP presence | 9090 | Broadcast/listener beacons |
 
+---
 
-Live chat via /stream (SSE)
+## Useful Scripts
+- `scripts/run-web.sh` — Launches the Spring Boot UI.
+- `scripts/run-plain.sh` — Starts the blocking TCP server.
+- `scripts/run-tls.sh` — Runs the TLS chat server (expects keystore).
 
-Messages & users held in-memory (clears on restart)
+Feel free to extend the `scripts/` directory with project-specific helpers.
 
-B) Web UI + H2 database (message history persists)
-cd web-app
-mvn spring-boot:run -Dspring-boot.run.profiles=db
-# open http://localhost:8080
+---
 
+## Troubleshooting
+- **Port already in use**: Use `lsof -i :<port>` (macOS/Linux) or `netstat -ano | findstr :<port>` (Windows) to identify and stop conflicting processes.
+- **SSE stream appears idle**: Verify the `/stream` endpoint is reachable and that at least one message has been logged.
+- **TLS handshake fails**: Confirm the client trusts the server certificate and that keystore/truststore passwords match your launch parameters.
+- **Persistent storage**: The current build keeps state in-memory. Add a `db` Spring profile with a file-based H2 datasource when you are ready to persist chat history.
 
-H2 file location (example): ./.data/securechat.mv.db
+---
 
-(Optional) H2 console if enabled in application-db.yml (e.g., /h2-console)
+## License & Attribution
+- Suggested license: MIT (add the full text to a `LICENSE` file).
+- Suggested ownership mapping:
+  - TCP core — chat-tcp
+  - Multithreading — chat-tcp / chat-nio
+  - NIO gateway — chat-nio
+  - TLS/SSL layer — chat-secure
+  - Web app & bridge — web-app
 
-C) Blocking TCP Server
-cd chat-tcp
-# run the server (class name may differ in your codebase)
-mvn -q exec:java -Dexec.mainClass=com.securechat.tcp.ChatServer
+---
 
-
-Connect a simple CLI client (another terminal):
-
-mvn -q exec:java -Dexec.mainClass=com.securechat.tcp.ChatCli -Dexec.args="localhost 5000 alice"
-mvn -q exec:java -Dexec.mainClass=com.securechat.tcp.ChatCli -Dexec.args="localhost 5000 bob"
-
-D) NIO Gateway (non-blocking)
-cd chat-nio
-mvn -q exec:java -Dexec.mainClass=com.securechat.nio.NioChatGateway
-
-E) TLS Secure Chat
-cd chat-secure
-# Server
-mvn -q exec:java -Dexec.mainClass=com.securechat.secure.SecureChatServer \
-  -Dexec.args="--keystore=../certs/server.p12 --storepass=changeit --port=5443"
-# Client
-mvn -q exec:java -Dexec.mainClass=com.securechat.secure.SecureChatCli \
-  -Dexec.args="--truststore=../certs/truststore.p12 --storepass=changeit --host=localhost --port=5443 --user=alice"
-
-F) UDP Presence (optional)
-cd udp-presence
-# Server
-mvn -q exec:java -Dexec.mainClass=com.securechat.udp.PresenceServer
-# Client (send periodic pings for a user)
-mvn -q exec:java -Dexec.mainClass=com.securechat.udp.PresenceClient -Dexec.args="alice"
-
-🌐 Web UI endpoints (for reference)
-Method	Path	Purpose
-GET	/	Login page (enter username)
-POST	/join	Join chat, redirect to /chat
-GET	/chat	Chat page (initial messages/users)
-POST	/send	Send message (form/HTMX)
-GET	/stream	SSE live message stream
-GET	/users (optional)	JSON list for sidebar
-GET	/h2-console (optional)	H2 console (db profile)
-
-Exact controllers may vary slightly with your implementation; the above is the intended contract.
-
-🔐 Config & profiles
-
-Default (no DB):
-web-app/src/main/resources/application.yml
-
-In-memory state for BroadcastHub & UserRegistry
-
-SSE enabled
-
-DB mode:
-web-app/src/main/resources/application-db.yml
-
-H2 datasource (file mode), Flyway migrations under /db/migration
-
-Spring Data repositories enabled
-
-Run with:
-
-mvn spring-boot:run -Dspring-boot.run.profiles=db
-
-
-TLS for Web UI (optional):
-
-You can serve the web app over HTTPS by adding server.ssl.* properties in application.yml and pointing to certs/server.p12. (Not required to demonstrate TLS between custom clients and the TLS socket server in chat-secure.)
-
-🧰 Useful scripts (if included)
-
-scripts/gen-certs.sh — generate keystore/truststore
-
-scripts/run-plain.sh — start blocking TCP
-
-scripts/run-nio.sh — start NIO gateway
-
-scripts/run-tls.sh — start TLS chat
-
-scripts/run-web.sh — start Spring Boot
-
-scripts/loadtest.sh — spawn fake clients
-
-If these are placeholders, adapt commands from the sections above.
-
-🧱 Troubleshooting
-
-Address already in use
-Another process is using the port. Change the port or stop the process:
-
-Windows: netstat -ano | findstr :5000, then taskkill /PID <pid> /F
-
-macOS/Linux: lsof -i :5000 → kill -9 <pid>
-
-Web UI loads but no live updates
-Ensure /stream (SSE) is reachable; check browser console/network tab.
-
-TLS client fails to connect
-Truststore must include the server certificate; verify --truststore path and password, or re-run keytool steps.
-
-H2 not persisting
-Make sure you ran with -Dspring-boot.run.profiles=db and the datasource points to a file (not mem:). Confirm ./.data/ exists and is git-ignored.
-
-📜 License
-
-MIT (or your chosen license). Put the text in LICENSE.
-
-👥 Credits / Ownership
-
-A: TCP core (chat-tcp)
-
-B: Multithreading (in tcp/nio servers)
-
-C: NIO gateway (chat-nio)
-
-D: TLS/SSL layer (chat-secure)
-
-E: Web app & bridge + H2 (web-app)
+If you use this project as a foundation, tailor the modules, ports, and certificates to match your deployment environment and security requirements.
