@@ -1,41 +1,42 @@
 package com.securechat.web.service;
 
-import com.securechat.core.Message;
+import com.securechat.web.model.UserView;
+import com.securechat.web.model.WebMessage;
 import com.securechat.web.repository.MessageRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.securechat.web.repository.UserRepository;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 @Service
+@Profile("db")
 public class MessageLogService {
-    private static final Logger log = LoggerFactory.getLogger(MessageLogService.class);
     private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
 
-    public MessageLogService(MessageRepository messageRepository) {
+    public MessageLogService(MessageRepository messageRepository, UserRepository userRepository) {
         this.messageRepository = messageRepository;
+        this.userRepository = userRepository;
     }
 
-    public void append(Message message) {
+    public void save(WebMessage message) {
         messageRepository.save(message);
+        userRepository.upsert(message.user());
     }
 
-    public List<Message> findRecent() {
-        return messageRepository.findRecent();
+    public List<WebMessage> findRecent(int limit) {
+        List<WebMessage> messages = messageRepository.findRecent(limit);
+        Collections.reverse(messages);
+        return messages;
     }
 
-    public void streamRecent(SseEmitter emitter) {
-        try {
-            for (Message message : findRecent()) {
-                emitter.send(message.getFrom() + ": " + message.getContent());
-            }
-            emitter.complete();
-        } catch (IOException e) {
-            log.warn("SSE stream failed", e);
-            emitter.completeWithError(e);
-        }
+    public List<UserView> findUsers() {
+        return userRepository.findAll();
+    }
+
+    public void registerUser(String username) {
+        userRepository.upsert(username);
     }
 }

@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+app:
+  sse:
+    keepAliveSeconds: 15
+  tokens:
+    enabled: true
+    url: ${FIGMA_MCP_URL:http://127.0.0.1:3845/mcp}
+    key: ${FIGMA_MCP_KEY:dev-key}
+
+spring:
+  thymeleaf:
+    cache: false
+logging:
+  level:
+    com.securechat: INFO
