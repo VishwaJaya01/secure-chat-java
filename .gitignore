@@ -1,0 +1,28 @@
+# Maven
+target/
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDEs
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Certificates and secrets
+certs/*.jks
+certs/*.p12
+certs/*.pem
+
+# H2 database files
+*.mv.db
+*.trace.db
