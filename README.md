@@ -61,6 +61,22 @@ cd secure-chat-java
 
 This builds every module, runs unit tests, and installs artifacts to your local Maven cache.
 
+### Verify in VS Code
+After cloning, open the workspace in VS Code and use the integrated terminal:
+
+```bash
+mvn clean install
+```
+
+This confirms the multi-module structure compiles end-to-end. Next, launch the web shell:
+
+```bash
+cd web-app
+mvn spring-boot:run
+```
+
+The browser will display the baseline “SecureChat” UI with the empty lobby/feed, ready for your team’s feature work.
+
 ---
 
 ## Running Components
