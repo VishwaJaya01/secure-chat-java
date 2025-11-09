@@ -1,0 +1,331 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background: radial-gradient(circle at 10% 20%, #0f172a, #020617 60%);
+  color: var(--text-primary);
+}
+
+code {
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.4rem;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: clamp(1.5rem, 4vw, 4rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel {
+  background: linear-gradient(135deg, var(--surface-card), var(--surface-raised));
+  border: 1px solid var(--border-muted);
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-raised);
+  padding: clamp(1.5rem, 4vw, 3rem);
+  width: min(480px, 100%);
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.lead {
+  color: var(--text-secondary);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--border-muted);
+  background: rgba(15, 23, 42, 0.6);
+  color: var(--text-primary);
+  font-size: 1rem;
+  resize: none;
+}
+
+textarea {
+  min-height: 80px;
+}
+
+button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.8rem 1.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-primary);
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+button.primary {
+  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+  color: var(--text-inverse);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.hint {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.chat-shell {
+  width: min(1200px, 100%);
+  background: rgba(2, 6, 23, 0.85);
+  border-radius: 1.5rem;
+  border: 1px solid var(--border-muted);
+  box-shadow: var(--shadow-raised);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.session {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.status-pill {
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.status-pill.connecting {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.6);
+}
+
+.status-pill.error {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.user-pill {
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.alert {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+}
+
+.chat-content {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.8fr);
+  gap: 1.5rem;
+}
+
+.chat-column {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-muted);
+  border-radius: 1.25rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.presence-column {
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-muted);
+  border-radius: 1.25rem;
+  padding: 1rem;
+}
+
+.message-list {
+  flex: 1;
+  min-height: 320px;
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding-right: 0.25rem;
+}
+
+.message-list.empty {
+  justify-content: center;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.message {
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.message.mine {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  align-self: flex-end;
+}
+
+.message.system {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.message header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.message p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.composer {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.composer textarea {
+  flex: 1;
+}
+
+.presence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.presence-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.presence-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.presence-panel li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
+}
+
+.presence-panel li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.presence-panel .avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: rgba(56, 189, 248, 0.2);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+}
+
+.presence-panel .name {
+  margin: 0;
+}
+
+.presence-panel .meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.presence-panel.empty {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .chat-content {
+    grid-template-columns: 1fr;
+  }
+
+  .presence-column {
+    order: -1;
+  }
+}

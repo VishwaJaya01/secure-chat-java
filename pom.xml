@@ -22,7 +22,6 @@
         <module>chat-nio</module>
         <module>chat-secure</module>
         <module>udp-presence</module>
-        <module>web-app</module>
     </modules>
 
     <properties>

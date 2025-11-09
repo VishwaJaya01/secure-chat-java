@@ -18,6 +18,11 @@ Thumbs.db
 # Logs
 *.log
 
+# Node / React artifacts
+node_modules/
+web-app/node_modules/
+web-app/dist/
+
 # Certificates and secrets
 certs/*.jks
 certs/*.p12
