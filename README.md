@@ -1,6 +1,6 @@
 # Secure Chat (Java)
 
-Secure Chat is a Java 17, Maven-driven workspace that demonstrates multiple transport strategies (blocking TCP, NIO, TLS) alongside a Spring Boot + Thymeleaf web interface. Each module is intentionally lightweight so the system can be extended for coursework, demos, or experimentation with secure real-time messaging.
+Secure Chat is a Java 17, Maven-driven workspace that demonstrates multiple transport strategies (blocking TCP, NIO, TLS) alongside a React + Vite web interface that consumes the Java chat services via REST + SSE. Each module is intentionally lightweight so the system can be extended for coursework, demos, or experimentation with secure real-time messaging.
 
 ---
 
@@ -8,7 +8,7 @@ Secure Chat is a Java 17, Maven-driven workspace that demonstrates multiple tran
 - Blocking TCP server with multithreaded client handling.
 - Non-blocking gateway using Java NIO selectors.
 - TLS/SSL transport via JSSE with keystore/truststore wiring.
-- Spring Boot web UI with Thymeleaf templates and SSE stream.
+- React + Vite frontend that talks to the Java chat services over REST/SSE.
 - In-memory persistence today, with H2 + Flyway scaffolding ready.
 - Optional UDP presence broadcaster/listener for beaconing status.
 
@@ -22,7 +22,7 @@ Secure Chat is a Java 17, Maven-driven workspace that demonstrates multiple tran
 | `chat-nio` | Selector-based gateway | Entry point for non-blocking experimentation |
 | `chat-secure` | TLS socket server/client | Demonstrates keystore & truststore usage |
 | `udp-presence` | UDP beacon services | Optional presence broadcast/receive |
-| `web-app` | Spring Boot 3 UI | Thymeleaf views, SSE feed, H2-ready wiring |
+| `web-app` (React) | Front-end SPA | Vite + React client for `/send` + `/stream` |
 
 ---
 
@@ -34,7 +34,7 @@ secure-chat-java/
 ├─ chat-nio/             # Non-blocking gateway placeholder
 ├─ chat-secure/          # TLS-enabled chat components
 ├─ udp-presence/         # Optional UDP beacons
-├─ web-app/              # Spring Boot web interface
+├─ web-app/              # React chat interface (Vite + TypeScript)
 ├─ certs/                # Keystore/truststore placeholders
 ├─ db/                   # Flyway SQL migrations (H2 scaffold)
 ├─ scripts/              # Helper launch scripts
@@ -68,25 +68,44 @@ After cloning, open the workspace in VS Code and use the integrated terminal:
 mvn clean install
 ```
 
-This confirms the multi-module structure compiles end-to-end. Next, launch the web shell:
+This confirms the multi-module structure compiles end-to-end. Next, spin up the React UI:
 
 ```bash
 cd web-app
-mvn spring-boot:run
+npm install
+npm run dev
+# or: ./scripts/run-web.sh
 ```
 
-The browser will display the baseline “SecureChat” UI with the empty lobby/feed, ready for your team’s feature work.
+The Vite dev server listens on <http://localhost:5173> and proxies `/api/*`,
+`/api/send`, and `/api/stream` calls to `http://localhost:8080` by default. Point
+`VITE_CHAT_API_URL` to whichever Java service exposes those endpoints.
 
 ---
 
 ## Running Components
 
-### Spring Boot Web UI (in-memory)
+### React Frontend (Vite)
 ```bash
 ./scripts/run-web.sh
-# Visit http://localhost:8080
+# Visit http://localhost:5173
 ```
-Messages are stored in-memory and published to the `/stream` SSE endpoint.
+Set `VITE_CHAT_API_URL` (defaults to `/api`) so the UI knows where to call
+`/send` and `/stream`. For example, to point directly at a Java service running
+on port 8080:
+
+```bash
+cd web-app
+VITE_CHAT_API_URL=http://localhost:8080 npm run dev
+```
+
+> The repository no longer ships a Spring MVC layer. Expose REST + SSE endpoints
+> from whichever Java transport module you prefer and keep them compatible with
+> `/send` (POST form: username/text) plus `/stream?u=<name>` (SSE).
+
+Design tokens for the UI live in `web-app/src/styles/tokens.css`. Use the
+`Figma MCP` server (configured in your `mcp.json`) to sync updated variables
+from design and drop them into that file.
 
 ### Blocking TCP Server
 ```bash
@@ -150,7 +169,8 @@ keytool -importcert -alias secure-chat-server -file certs/server.crt \
 ## Common Port Map
 | Service | Port | Notes |
 |---------|------|-------|
-| Spring Boot web UI | 8080 | HTTP + SSE stream |
+| React dev server | 5173 | Vite + React front-end |
+| Chat API gateway (your Java service) | 8080 | Expose `/send`, `/stream` for the UI |
 | TCP server | 9000 | Blocking sockets (`run-plain.sh`) |
 | NIO gateway | 5001 | Selector-driven placeholder |
 | TLS server | 5443 | Requires keystore in `certs/` |
@@ -159,7 +179,7 @@ keytool -importcert -alias secure-chat-server -file certs/server.crt \
 ---
 
 ## Useful Scripts
-- `scripts/run-web.sh` — Launches the Spring Boot UI.
+- `scripts/run-web.sh` — Launches the React/Vite dev server for the UI.
 - `scripts/run-plain.sh` — Starts the blocking TCP server.
 - `scripts/run-tls.sh` — Runs the TLS chat server (expects keystore).
 
@@ -182,7 +202,7 @@ Feel free to extend the `scripts/` directory with project-specific helpers.
   - Multithreading — chat-tcp / chat-nio
   - NIO gateway — chat-nio
   - TLS/SSL layer — chat-secure
-  - Web app & bridge — web-app
+  - Web UI — web-app (React)
 
 ---
 
