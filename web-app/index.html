@@ -4,10 +4,35 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/secure-chat.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Secure Chat</title>
+    <title>SecureCollab</title>
+    <style>
+      /* Fallback styles in case CSS doesn't load */
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      #root {
+        min-height: 100vh;
+      }
+      /* Loading indicator */
+      #root:empty::before {
+        content: "Loading...";
+        display: block;
+        padding: 2rem;
+        text-align: center;
+        color: #94a3b8;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="padding: 2rem; text-align: center; color: #94a3b8;">
+        Loading SecureCollab...
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

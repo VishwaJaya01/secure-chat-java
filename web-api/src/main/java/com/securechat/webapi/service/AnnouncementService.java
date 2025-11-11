@@ -1,0 +1,46 @@
+package com.securechat.webapi.service;
+
+import com.securechat.core.Announcement;
+import com.securechat.core.AnnouncementBroadcastHub;
+import com.securechat.webapi.store.InMemoryAnnouncementStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class AnnouncementService {
+    private static final Logger log = LoggerFactory.getLogger(AnnouncementService.class);
+
+    private final InMemoryAnnouncementStore announcementStore;
+    private final AnnouncementBroadcastHub broadcastHub;
+
+    @Autowired
+    public AnnouncementService(InMemoryAnnouncementStore announcementStore, AnnouncementBroadcastHub broadcastHub) {
+        this.announcementStore = announcementStore;
+        this.broadcastHub = broadcastHub;
+    }
+
+    /**
+     * Creates an announcement, stores it in memory, and broadcasts it to the NIO gateway.
+     * The in-memory store will handle broadcasting to SSE clients.
+     */
+    public Announcement createAnnouncement(String author, String title, String content) {
+        // Add to the in-memory store, which also handles SSE broadcasting
+        Announcement announcement = announcementStore.addAnnouncement(author, title, content);
+
+        // Broadcast to the external NIO gateway
+        broadcastHub.broadcast(announcement);
+
+        log.info("Created and broadcasted announcement via NIO Hub: #{} by {}", announcement.getId(), author);
+
+        return announcement;
+    }
+
+    public List<Announcement> getAllAnnouncements() {
+        return announcementStore.getAllAnnouncements();
+    }
+}
+
