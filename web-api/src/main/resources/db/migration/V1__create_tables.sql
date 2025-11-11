@@ -68,3 +68,4 @@ CREATE TABLE IF NOT EXISTS link_previews (
 INSERT INTO chat_users (user_id, display_name, is_admin) 
 SELECT 'admin', 'Administrator', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM chat_users WHERE user_id = 'admin');
+

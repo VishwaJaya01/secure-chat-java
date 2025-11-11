@@ -19,9 +19,10 @@
     <modules>
         <module>chat-core</module>
         <module>chat-tcp</module>
-        <module>chat-nio</module>
         <module>chat-secure</module>
         <module>udp-presence</module>
+        <module>announcement-nio</module>
+        <module>web-api</module>
     </modules>
 
     <properties>

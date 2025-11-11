@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import type { ChatMessage } from '../types';
 import { formatTimestamp } from '../utils/time';
+import type { ChatMessage } from '../types';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -35,12 +35,12 @@ export const MessageList = ({ messages }: MessageListProps) => {
           }`}
         >
           <header>
-            <span className="author">{message.user}</span>
-            <time dateTime={message.timestamp}>
-              {formatTimestamp(message.timestamp)}
+            <span className="author">{message.author}</span>
+            <time dateTime={message.createdAt}>
+              {formatTimestamp(message.createdAt)}
             </time>
           </header>
-          <p>{message.text}</p>
+          <p>{message.content}</p>
         </article>
       ))}
     </div>

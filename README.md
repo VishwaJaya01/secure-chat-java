@@ -1,209 +1,374 @@
-# Secure Chat (Java)
+# SecureCollab - Upscaled Project
 
-Secure Chat is a Java 17, Maven-driven workspace that demonstrates multiple transport strategies (blocking TCP, NIO, TLS) alongside a React + Vite web interface that consumes the Java chat services via REST + SSE. Each module is intentionally lightweight so the system can be extended for coursework, demos, or experimentation with secure real-time messaging.
+SecureCollab is a Java 17, Maven-driven workspace with Spring Boot backend and React frontend that demonstrates multiple network concepts through distinct features. Each team member owns a distinct web-app feature showcasing one core network concept.
 
 ---
 
-## Key Capabilities
-- Blocking TCP server with multithreaded client handling.
-- Non-blocking gateway using Java NIO selectors.
-- TLS/SSL transport via JSSE with keystore/truststore wiring.
-- React + Vite frontend that talks to the Java chat services over REST/SSE.
-- In-memory persistence today, with H2 + Flyway scaffolding ready.
-- Optional UDP presence broadcaster/listener for beaconing status.
+## Project Overview
+
+This project demonstrates:
+- **Chat**: Live team conversation via API + SSE
+- **Announcements**: Admin → everyone, real-time (NIO)
+- **Tasks/Board**: CRUD + live updates, background workers (Multithreading)
+- **File Transfer**: Secure point-to-point, non-HTTP (TCP)
+- **Presence**: Online/idle/offline via UDP
+- **Link Previews**: Server-side URL/URI fetch/unfurl
+- **Security**: TLS for sockets + HTTPS for API
 
 ---
 
 ## Module Overview
-| Module | Role | Notes |
-|--------|------|-------|
-| `chat-core` | Shared models & registries | `Message`, `BroadcastHub`, `UserRegistry` |
-| `chat-tcp` | Blocking socket server/client | Simple CLI harness for testing |
-| `chat-nio` | Selector-based gateway | Entry point for non-blocking experimentation |
-| `chat-secure` | TLS socket server/client | Demonstrates keystore & truststore usage |
-| `udp-presence` | UDP beacon services | Optional presence broadcast/receive |
-| `web-app` (React) | Front-end SPA | Vite + React client for `/send` + `/stream` |
+
+| Module | Role | Owner | Network Concept |
+|--------|------|-------|-----------------|
+| `chat-core` | Shared models & registries | All | Domain primitives |
+| `web-api` | Spring Boot REST API + SSE | All | HTTP/SSE endpoints |
+| `announcement-nio` | NIO announcement gateway | Member C | NIO (Selector) |
+| `chat-tcp` | TCP file transfer | Member A | TCP sockets |
+| `chat-secure` | TLS/SSL security layer | Member D | TLS/SSL |
+| `udp-presence` | UDP presence service | Member E | UDP |
+| `web-app` | React frontend | All | React + Vite |
 
 ---
 
 ## Project Layout
+
 ```
 secure-chat-java/
 ├─ chat-core/            # Domain primitives and registries
-├─ chat-tcp/             # Blocking TCP server & CLI client
-├─ chat-nio/             # Non-blocking gateway placeholder
-├─ chat-secure/          # TLS-enabled chat components
-├─ udp-presence/         # Optional UDP beacons
-├─ web-app/              # React chat interface (Vite + TypeScript)
-├─ certs/                # Keystore/truststore placeholders
-├─ db/                   # Flyway SQL migrations (H2 scaffold)
+├─ web-api/              # Spring Boot REST API (main backend)
+├─ announcement-nio/     # NIO announcement gateway (port 6001)
+├─ chat-tcp/             # TCP file transfer (port 6000)
+├─ chat-secure/          # TLS-enabled components
+├─ udp-presence/         # UDP presence beacons (port 9090)
+├─ web-app/              # React frontend (Vite + TypeScript)
+├─ db/                   # Flyway SQL migrations (H2)
 ├─ scripts/              # Helper launch scripts
-├─ pom.xml               # Maven parent (aggregator)
-└─ .gitignore
+└─ pom.xml               # Maven parent (aggregator)
 ```
 
 ---
 
 ## Prerequisites
-- Java 17 or newer (set `JAVA_HOME` accordingly).
-- Maven 3.9+ (or use the bundled `./mvnw` wrapper).
-- `keytool` for generating local TLS assets (ships with the JDK).
-- Optional tooling: `curl` for quick checks, Wireshark for TLS demos.
+
+- Java 17 or newer (set `JAVA_HOME` accordingly)
+- Maven 3.9+ (or use the bundled `./mvnw` wrapper)
+- Node.js 18+ and npm
+- `keytool` for generating local TLS assets (ships with the JDK)
 
 ---
 
 ## Quick Start
+
+### 1. Build All Modules
+
 ```bash
-git clone <your-repo-url> secure-chat-java
-cd secure-chat-java
 ./mvnw clean install
 ```
 
-This builds every module, runs unit tests, and installs artifacts to your local Maven cache.
-
-### Verify in VS Code
-After cloning, open the workspace in VS Code and use the integrated terminal:
+### 2. Start Backend
 
 ```bash
-mvn clean install
+cd web-api
+../mvnw spring-boot:run
 ```
 
-This confirms the multi-module structure compiles end-to-end. Next, spin up the React UI:
+The API will start on `http://localhost:8080`
+
+### 3. Start Frontend
 
 ```bash
 cd web-app
 npm install
 npm run dev
-# or: ./scripts/run-web.sh
 ```
 
-The Vite dev server listens on <http://localhost:5173> and proxies `/api/*`,
-`/api/send`, and `/api/stream` calls to `http://localhost:8080` by default. Point
-`VITE_CHAT_API_URL` to whichever Java service exposes those endpoints.
+The frontend will be available at `http://localhost:5173`
 
 ---
 
-## Running Components
+## Features & Endpoints
 
-### React Frontend (Vite)
-```bash
-./scripts/run-web.sh
-# Visit http://localhost:5173
-```
-Set `VITE_CHAT_API_URL` (defaults to `/api`) so the UI knows where to call
-`/send` and `/stream`. For example, to point directly at a Java service running
-on port 8080:
+### Chat
+- `POST /api/send` - Send a message
+- `GET /api/stream?u=<username>` - SSE stream of messages
 
-```bash
-cd web-app
-VITE_CHAT_API_URL=http://localhost:8080 npm run dev
-```
+### Announcements (Member C - NIO)
+- `POST /api/announcements` - Create announcement (admin only)
+- `GET /api/announcements` - Get all announcements
+- `GET /api/announcements/{id}` - Get announcement by ID
+- `GET /api/announcements/stream` - SSE stream of announcements
+- **NIO Gateway**: Port 6001 (non-blocking selector)
 
-> The repository no longer ships a Spring MVC layer. Expose REST + SSE endpoints
-> from whichever Java transport module you prefer and keep them compatible with
-> `/send` (POST form: username/text) plus `/stream?u=<name>` (SSE).
+### Tasks (Member B - Multithreading)
+- `GET /api/tasks` - Get all tasks
+- `POST /api/tasks` - Create a task
+- `PUT /api/tasks/{id}` - Update a task
+- `DELETE /api/tasks/{id}` - Delete a task
+- `GET /api/tasks/stream` - SSE stream of tasks
+- **Background Workers**: ExecutorService (to be implemented)
 
-Design tokens for the UI live in `web-app/src/styles/tokens.css`. Use the
-`Figma MCP` server (configured in your `mcp.json`) to sync updated variables
-from design and drop them into that file.
+### Files (Member A - TCP)
+- `GET /api/files` - Get all files
+- `GET /api/files/{id}` - Get file metadata
+- `POST /api/files/meta` - Create file metadata
+- **TCP Server**: Port 6000 (file transfer)
 
-### Blocking TCP Server
-```bash
-./scripts/run-plain.sh          # defaults to port 9000
-# In a second terminal
-./mvnw -pl chat-tcp -am exec:java \
-  -Dexec.mainClass=com.securechat.tcp.ChatCli \
-  -Dexec.args="localhost 9000 alice"
-```
+### Presence (Member E - UDP)
+- `GET /api/users` - Get all users
+- `GET /api/users/status` - Get user status map
+- `POST /api/presence/beat` - Update user presence
+- **UDP Server**: Port 9090 (presence beacons)
 
-### NIO Gateway
-```bash
-./mvnw -pl chat-nio -am exec:java \
-  -Dexec.mainClass=com.securechat.nio.NioChatGateway \
-  -Dexec.args="5001"
-```
-
-### TLS Chat Server & Client
-1. Place keystore/truststore files in `certs/` (see below).
-2. Start the server:
-   ```bash
-   ./scripts/run-tls.sh
-   ```
-3. Connect a client:
-   ```bash
-   ./mvnw -pl chat-secure -am exec:java \
-     -Dexec.mainClass=com.securechat.secure.SecureChatCli \
-     -Dexec.args="localhost 5443"
-   ```
-
-### UDP Presence (optional)
-```bash
-./mvnw -pl udp-presence -am exec:java \
-  -Dexec.mainClass=com.securechat.udp.PresenceServer -Dexec.args="9090"
-./mvnw -pl udp-presence -am exec:java \
-  -Dexec.mainClass=com.securechat.udp.PresenceClient -Dexec.args="9090"
-```
+### Link Previews (Member E - URL/URI)
+- `POST /api/link/preview?url=<url>` - Get link preview
 
 ---
 
-## TLS Assets
-Place certificates under `certs/`. For local testing, a minimal `keytool` workflow is:
+## Port Configuration
 
-```bash
-keytool -genkeypair -alias secure-chat-server -keyalg RSA -keysize 2048 \
-  -dname "CN=localhost, OU=Dev, O=SecureChat, L=Colombo, S=Western, C=LK" \
-  -validity 365 -storetype PKCS12 \
-  -keystore certs/server.p12 -storepass changeit
-
-keytool -exportcert -alias secure-chat-server -keystore certs/server.p12 \
-  -storepass changeit -rfc > certs/server.crt
-
-keytool -importcert -alias secure-chat-server -file certs/server.crt \
-  -keystore certs/truststore.p12 -storetype PKCS12 -storepass changeit -noprompt
-```
-
-> ⚠️ Never commit real certificates or credentials. Replace `changeit` with secure values in production.
-
----
-
-## Common Port Map
 | Service | Port | Notes |
 |---------|------|-------|
-| React dev server | 5173 | Vite + React front-end |
-| Chat API gateway (your Java service) | 8080 | Expose `/send`, `/stream` for the UI |
-| TCP server | 9000 | Blocking sockets (`run-plain.sh`) |
-| NIO gateway | 5001 | Selector-driven placeholder |
-| TLS server | 5443 | Requires keystore in `certs/` |
-| UDP presence | 9090 | Broadcast/listener beacons |
+| React dev server | 5173 | Vite + React frontend |
+| Spring Boot API | 8080 | REST + SSE endpoints |
+| NIO Gateway | 6001 | Announcement broadcasting |
+| TCP File Server | 6000 | File transfer (Member A) |
+| UDP Presence | 9090 | Presence beacons (Member E) |
+| TLS File Server | 6443 | Secure file transfer (Member D) |
+| HTTPS API | 8443 | Secure API (Member D) |
 
 ---
 
-## Useful Scripts
-- `scripts/run-web.sh` — Launches the React/Vite dev server for the UI.
-- `scripts/run-plain.sh` — Starts the blocking TCP server.
-- `scripts/run-tls.sh` — Runs the TLS chat server (expects keystore).
+## Database
 
-Feel free to extend the `scripts/` directory with project-specific helpers.
+The project uses H2 database with Flyway migrations. The database file is stored at `./data/securecollab.mv.db`.
+
+### Database Console
+
+Access the H2 console at `http://localhost:8080/h2-console`:
+- JDBC URL: `jdbc:h2:file:./data/securecollab`
+- Username: `sa`
+- Password: (empty)
+
+### Profiles
+
+- **Default**: In-memory (no database)
+- **db**: H2 database with Flyway migrations
+
+To use the database profile:
+```bash
+cd web-api
+../mvnw spring-boot:run -Dspring-boot.run.profiles=db
+```
+
+---
+
+## Member Responsibilities
+
+### Member A — File Transfer Service (TCP)
+**Network Concept**: TCP sockets (java.net.ServerSocket/Socket)
+
+**Deliverables**:
+- File server on TCP port 6000
+- File client for upload/download
+- ChunkFramer (fixed-size or length-prefixed)
+- REST metadata endpoints: `POST /api/files/meta`, `GET /api/files/:id`
+- Corruption-free transfer (checksum), resumable or chunked
+
+**Status**: Stubs provided, implementation needed
+
+### Member B — Task Board & Workers (Multithreading)
+**Network Concept**: Multithreading (ExecutorService, synchronization)
+
+**Deliverables**:
+- Task service with CRUD operations
+- Worker pool (ExecutorService) + thread-safe queues
+- Rate-limit task updates
+- SSE stream for real-time updates
+- Background workers for task events
+
+**Status**: Basic CRUD implemented, workers needed
+
+### Member C — Announcements Broadcast (NIO) ✅
+**Network Concept**: NIO (non-blocking I/O) with Selector
+
+**Deliverables**:
+- ✅ AnnouncementGateway (ServerSocketChannel + Selector)
+- ✅ Bridge to API: gateway → BroadcastHub → SSE to React
+- ✅ REST endpoints: `POST /api/announcements`, `GET /api/announcements`
+- ✅ SSE stream: `GET /api/announcements/stream`
+- ✅ Single-threaded selector handles many clients
+
+**Status**: Complete
+
+### Member D — Security Layer (TLS/SSL)
+**Network Concept**: Secure network programming (TLS/SSL + HTTPS)
+
+**Deliverables**:
+- TLS file server on port 6443
+- TLS announcement gateway (optional)
+- HTTPS API on port 8443
+- Keystores/truststores management
+- Cipher/handshake policy
+
+**Status**: Stubs provided, implementation needed
+
+### Member E — Presence + Link Previews (UDP & URL/URI)
+**Network Concept**: UDP + URL/URI / HttpURLConnection
+
+**Deliverables**:
+- ✅ Link preview service (implemented)
+- PresenceServer (DatagramSocket on port 9090)
+- PresenceService with lastSeen thresholds
+- UDP beacons (ping:<user>)
+- React presence sidebar
+
+**Status**: Link previews complete, UDP presence needed
+
+---
+
+## NIO Announcements Gateway (Member C)
+
+The NIO gateway demonstrates non-blocking I/O using Java NIO Selector.
+
+### How It Works
+
+1. Gateway starts on port 6001
+2. Uses a single-threaded selector to handle multiple clients
+3. When an announcement is created via REST API:
+   - AnnouncementService saves to database
+   - Broadcasts to AnnouncementBroadcastHub
+   - Hub notifies all registered consumers (including NIO gateway)
+   - Gateway broadcasts to all connected NIO clients
+4. React frontend receives updates via SSE stream
+
+### Testing
+
+1. Start the application
+2. Login as "admin" user
+3. Go to Announcements page
+4. Create an announcement
+5. Check backend logs for selector events (READ/WRITE/ACCEPT)
+6. All connected clients receive the broadcast
+
+### Logs
+
+The gateway logs selector events for debugging:
+```
+INFO  - NIO AnnouncementGateway started on port 6001
+INFO  - Client connected: /127.0.0.1:54321 (total: 1)
+INFO  - Broadcasted announcement to 1 clients
+```
+
+---
+
+## Frontend Structure
+
+The React app uses routing with the following pages:
+- **Chat**: Real-time chat interface
+- **Announcements**: Admin announcements with NIO gateway integration
+- **Tasks**: Task board with drag-and-drop (to be enhanced)
+- **Files**: File metadata and download (TCP transfer to be implemented)
+
+### Components
+
+- `Layout`: Main layout with navigation and presence sidebar
+- `ChatPage`: Chat interface with SSE stream
+- `AnnouncementsPage`: Announcements with admin form
+- `TasksPage`: Task board with status columns
+- `FilesPage`: File list and metadata
+- `PresencePanel`: User presence sidebar
+
+---
+
+## Configuration
+
+### Application Properties (`web-api/src/main/resources/application.properties`)
+
+```properties
+# Server
+server.port=8080
+
+# H2 Database
+spring.datasource.url=jdbc:h2:file:./data/securecollab;AUTO_SERVER=TRUE
+spring.datasource.username=sa
+spring.datasource.password=
+
+# NIO Gateway
+nio.gateway.port=6001
+nio.gateway.enabled=true
+
+# UDP Presence
+udp.presence.port=9090
+udp.presence.enabled=true
+
+# File Transfer
+file.transfer.tcp.port=6000
+file.transfer.enabled=true
+```
 
 ---
 
 ## Troubleshooting
-- **Port already in use**: Use `lsof -i :<port>` (macOS/Linux) or `netstat -ano | findstr :<port>` (Windows) to identify and stop conflicting processes.
-- **SSE stream appears idle**: Verify the `/stream` endpoint is reachable and that at least one message has been logged.
-- **TLS handshake fails**: Confirm the client trusts the server certificate and that keystore/truststore passwords match your launch parameters.
-- **Persistent storage**: The current build keeps state in-memory. Add a `db` Spring profile with a file-based H2 datasource when you are ready to persist chat history.
+
+- **Port already in use**: Use `lsof -i :<port>` (macOS/Linux) or `netstat -ano | findstr :<port>` (Windows)
+- **SSE stream appears idle**: Verify the endpoint is reachable and messages are being sent
+- **Database errors**: Check that H2 database file has write permissions
+- **NIO gateway not starting**: Check port 6001 is available and logs for errors
+- **Admin user not found**: The admin user is created automatically in the database migration
+
+---
+
+## Implementation Status
+
+### ✅ Member C - NIO Announcements (COMPLETE)
+
+**What's Implemented**:
+- ✅ NIO Gateway with Selector on port 6001
+- ✅ Single-threaded selector handles multiple clients
+- ✅ AnnouncementBroadcastHub for fan-out
+- ✅ REST endpoints: POST/GET /api/announcements
+- ✅ SSE stream: GET /api/announcements/stream
+- ✅ Admin validation and database persistence
+- ✅ React frontend integration
+
+**Flow**: Admin creates announcement → Service → BroadcastHub → NIO Gateway (port 6001) + SSE (React)
+
+### ✅ Other Services (INITIATED - Ready for Implementation)
+
+**Member A - TCP File Transfer**:
+- ✅ FileService, FileController, FileEntity created
+- ✅ REST endpoints: POST /api/files/meta, GET /api/files
+- ❌ Needs: TCP server on port 6000, file upload/download, ChunkFramer
+
+**Member B - Task Board & Workers**:
+- ✅ TaskService, TaskController, TaskEntity created
+- ✅ CRUD operations and SSE stream
+- ❌ Needs: ExecutorService worker pool, thread-safe queues, background workers
+
+**Member D - Security Layer (TLS/SSL)**:
+- ✅ chat-secure module structure
+- ❌ Needs: TLS file server (port 6443), HTTPS API (port 8443), keystore management
+
+**Member E - Presence & Link Previews**:
+- ✅ LinkPreviewService (fully implemented)
+- ✅ PresenceService with status calculation
+- ✅ REST endpoints ready
+- ❌ Needs: UDP server on port 9090, UDP beacons
+
+---
+
+## Development Notes
+
+- The NIO gateway is fully implemented and integrated (Member C)
+- Other services (TCP file transfer, UDP presence, TLS, multithreading workers) have stubs and endpoints ready
+- All SSE streams are implemented for real-time updates
+- Database migrations are set up for all entities
+- React frontend is complete with routing and all pages
 
 ---
 
 ## License & Attribution
-- Suggested license: MIT (add the full text to a `LICENSE` file).
-- Suggested ownership mapping:
-  - TCP core — chat-tcp
-  - Multithreading — chat-tcp / chat-nio
-  - NIO gateway — chat-nio
-  - TLS/SSL layer — chat-secure
-  - Web UI — web-app (React)
 
----
-
-If you use this project as a foundation, tailor the modules, ports, and certificates to match your deployment environment and security requirements.
+- Suggested license: MIT
+- This project demonstrates various network programming concepts for educational purposes
