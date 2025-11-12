@@ -2,6 +2,8 @@ package com.securechat.webapi.service;
 
 import com.securechat.webapi.entity.MessageEntity;
 import com.securechat.webapi.repository.MessageRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +16,7 @@ import java.util.regex.Pattern;
 
 @Service
 public class ChatService {
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final Pattern URL_PATTERN = Pattern.compile(
         "(?i)\\b(https?://[\\w.-]+(?:\\.[\\w.-]+)*(?:/[^\\s]*)?|www\\.[\\w.-]+(?:\\.[\\w.-]+)*(?:/[^\\s]*)?)"
     );
@@ -29,20 +32,29 @@ public class ChatService {
 
     @Transactional
     public MessageEntity sendMessage(String username, String text) {
+        log.info("   └─ [SERVICE] ChatService.sendMessage() - Persisting message to database");
+        log.info("      → Using MessageRepository (JPA/Hibernate)");
+        
         MessageEntity message = new MessageEntity();
         message.setAuthor(username);
         message.setContent(text);
         MessageEntity saved = messageRepository.save(message);
+        log.info("      → Message saved with ID: {}", saved.getId());
         
         // Asynchronously fetch link previews for URLs in the message
-        extractUrls(text).forEach(url -> {
-            try {
-                linkPreviewService.getOrFetchPreview(url);
-            } catch (Exception e) {
-                // Silently fail - preview fetching shouldn't block message sending
-            }
-        });
+        List<String> urls = extractUrls(text);
+        if (!urls.isEmpty()) {
+            log.info("      → [SERVICE] Detected {} URL(s), calling LinkPreviewService", urls.size());
+            urls.forEach(url -> {
+                try {
+                    linkPreviewService.getOrFetchPreview(url);
+                } catch (Exception e) {
+                    log.debug("      → Link preview fetch failed for {}: {}", url, e.getMessage());
+                }
+            });
+        }
         
+        log.info("   └─ [SERVICE] ChatService.sendMessage() - Completed");
         return saved;
     }
 

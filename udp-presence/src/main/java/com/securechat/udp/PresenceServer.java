@@ -17,6 +17,7 @@ public class PresenceServer implements Runnable, AutoCloseable {
     private final String serverId;
     private final long intervalMillis;
     private volatile boolean running = true;
+    private long broadcastCount = 0;
 
     public PresenceServer(int port, String serverId) {
         this(port, serverId, 5000); // Default: broadcast every 5 seconds
@@ -45,7 +46,12 @@ public class PresenceServer implements Runnable, AutoCloseable {
                         port
                     );
                     socket.send(packet);
-                    log.debug("Sent presence beacon: {}", payload);
+                    broadcastCount++;
+                    // Log every 6th broadcast (every ~30 seconds with 5s interval) to avoid spam
+                    if (broadcastCount % 6 == 0) {
+                        log.info("📡 UDP PRESENCE BEACON: Broadcasting '{}' to 255.255.255.255:{} (broadcast #{})", 
+                            serverId, port, broadcastCount);
+                    }
                     
                     Thread.sleep(intervalMillis);
                 } catch (InterruptedException e) {

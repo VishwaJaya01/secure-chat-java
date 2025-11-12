@@ -2,6 +2,8 @@ package com.securechat.webapi.service;
 
 import com.securechat.webapi.entity.TaskEntity;
 import com.securechat.webapi.repository.TaskRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +12,7 @@ import java.util.List;
 
 @Service
 public class TaskService {
+    private static final Logger log = LoggerFactory.getLogger(TaskService.class);
     private final TaskRepository taskRepository;
 
     @Autowired
@@ -19,13 +22,21 @@ public class TaskService {
 
     @Transactional
     public TaskEntity createTask(String title, String description, String createdBy, String assignee) {
+        log.info("   └─ [SERVICE] TaskService.createTask() - Creating new task");
+        log.info("      → Using TaskRepository (JPA/Hibernate)");
+        
         TaskEntity task = new TaskEntity();
         task.setTitle(title);
         task.setDescription(description);
         task.setCreatedBy(createdBy);
         task.setAssignee(assignee);
         task.setStatus("todo");
-        return taskRepository.save(task);
+        
+        TaskEntity saved = taskRepository.save(task);
+        log.info("      → Task saved with ID: {}", saved.getId());
+        log.info("   └─ [SERVICE] TaskService.createTask() - Completed");
+        
+        return saved;
     }
 
     public List<TaskEntity> getAllTasks() {
@@ -52,6 +63,7 @@ public class TaskService {
         taskRepository.deleteById(id);
     }
 }
+
 
 
 

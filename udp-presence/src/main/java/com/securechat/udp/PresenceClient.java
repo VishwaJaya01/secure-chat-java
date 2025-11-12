@@ -41,7 +41,9 @@ public class PresenceClient implements Runnable, AutoCloseable {
                     String message = new String(packet.getData(), 0, packet.getLength());
                     if (message.startsWith("PRESENCE:")) {
                         String serverId = message.substring("PRESENCE:".length());
-                        log.debug("Received presence beacon from {}: {}", packet.getAddress(), serverId);
+                        // Only log at debug level - actual login will be logged by PresenceService when status changes
+                        log.debug("📡 UDP PRESENCE BEACON: Received from {} → Server ID: {}", 
+                            packet.getAddress().getHostAddress(), serverId);
                         presenceHandler.accept(serverId);
                     }
                 } catch (IOException e) {

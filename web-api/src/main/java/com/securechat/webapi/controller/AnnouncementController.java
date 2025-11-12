@@ -3,6 +3,8 @@ package com.securechat.webapi.controller;
 import com.securechat.core.Announcement;
 import com.securechat.webapi.service.AnnouncementService;
 import com.securechat.webapi.store.InMemoryAnnouncementStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,6 +18,7 @@ import java.util.List;
 @RequestMapping("/api/announcements")
 @CrossOrigin(origins = "http://localhost:5173")
 public class AnnouncementController {
+    private static final Logger log = LoggerFactory.getLogger(AnnouncementController.class);
     private final AnnouncementService announcementService;
     private final InMemoryAnnouncementStore announcementStore;
 
@@ -30,10 +33,20 @@ public class AnnouncementController {
             @RequestParam String author,
             @RequestParam String title,
             @RequestParam String content) {
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log.info("📥 [CONTROLLER] AnnouncementController.createAnnouncement() - HTTP POST /api/announcements");
+        log.info("   → Service Flow: AnnouncementController → AnnouncementService → InMemoryAnnouncementStore → NIO Gateway");
+        log.info("   → Parameters: author={}, title={}, content={}", author, title, 
+            content.length() > 50 ? content.substring(0, 50) + "..." : content);
+        log.info("   → [SERVICE] Calling AnnouncementService.createAnnouncement()");
+        
         try {
             Announcement announcement = announcementService.createAnnouncement(author, title, content);
+            log.info("✅ [CONTROLLER] AnnouncementController.createAnnouncement() - Request completed");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             return ResponseEntity.status(HttpStatus.CREATED).body(announcement);
         } catch (Exception e) {
+            log.error("❌ [CONTROLLER] AnnouncementController.createAnnouncement() - Error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -51,6 +64,7 @@ public class AnnouncementController {
         return emitter;
     }
 }
+
 
 
 

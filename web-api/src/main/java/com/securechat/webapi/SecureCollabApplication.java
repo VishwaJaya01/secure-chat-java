@@ -76,6 +76,8 @@ public class SecureCollabApplication implements CommandLineRunner, DisposableBea
 
         // Start TLS Chat Server if enabled
         if (tlsChatEnabled) {
+            System.out.println("🔒 TLS: Starting TLS Chat Server on port " + tlsChatPort);
+            System.out.println("🔒 TLS: Loading keystore from: " + keystorePath);
             try (InputStream keystoreStream = new FileInputStream(keystorePath)) {
                 char[] password = keystorePassword.toCharArray();
                 tlsChatServer = new SecureChatServer(
@@ -84,11 +86,17 @@ public class SecureCollabApplication implements CommandLineRunner, DisposableBea
                     keystoreStream,
                     password
                 );
-                new Thread(tlsChatServer).start();
+                Thread tlsThread = new Thread(tlsChatServer);
+                tlsThread.setName("TLS-Chat-Server");
+                tlsThread.start();
+                System.out.println("🔒 TLS: TLS Chat Server thread started");
             } catch (Exception e) {
-                System.err.println("Failed to start TLS Chat Server: " + e.getMessage());
-                System.err.println("TLS Chat will be disabled. Ensure keystore exists at: " + keystorePath);
+                System.err.println("🔒 TLS: Failed to start TLS Chat Server: " + e.getMessage());
+                System.err.println("🔒 TLS: TLS Chat will be disabled. Ensure keystore exists at: " + keystorePath);
+                e.printStackTrace();
             }
+        } else {
+            System.out.println("🔒 TLS: TLS Chat Server is disabled (tls.chat.enabled=false)");
         }
 
         // Start UDP Presence Server and Client if enabled
@@ -99,8 +107,9 @@ public class SecureCollabApplication implements CommandLineRunner, DisposableBea
             
             // Listen for presence beacons from other servers
             udpPresenceClient = new PresenceClient(udpPresencePort, (serverIdFromBeacon) -> {
-                // Update presence when we receive a beacon
-                presenceService.updatePresence(serverIdFromBeacon, "Server");
+                // Update presence when we receive a beacon (displayName=null indicates UDP beacon)
+                // This will only log when status changes (e.g., when member logs in)
+                presenceService.updatePresence(serverIdFromBeacon, null);
             });
             new Thread(udpPresenceClient).start();
         }

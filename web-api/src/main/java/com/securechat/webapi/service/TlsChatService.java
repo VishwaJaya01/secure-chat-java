@@ -19,7 +19,8 @@ public class TlsChatService {
     }
 
     public void handleTlsMessage(Message message) {
-        log.info("Processing TLS message from {}: {}", message.getFrom(), message.getContent());
+        String preview = message.getContent().length() > 50 ? message.getContent().substring(0, 50) + "..." : message.getContent();
+        log.info("💬 CHAT MESSAGE (TLS): {} → {}", message.getFrom(), preview);
         
         // Persist message via ChatService
         MessageEntity entity = chatService.sendMessage(message.getFrom(), message.getContent());

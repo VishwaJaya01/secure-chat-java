@@ -12,6 +12,7 @@ import javax.net.ssl.SSLSocket;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,14 +41,21 @@ public class SecureChatServer implements Runnable, AutoCloseable {
 
     private SSLContext createContext(InputStream keyStoreStream, char[] password) {
         try {
+            log.info("🔒 TLS: Initializing SSLContext with JKS keystore");
             KeyStore keyStore = KeyStore.getInstance("JKS");
             keyStore.load(keyStoreStream, password);
+            log.debug("🔒 TLS: Keystore loaded successfully");
+            
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             kmf.init(keyStore, password);
+            log.debug("🔒 TLS: KeyManagerFactory initialized with algorithm: {}", KeyManagerFactory.getDefaultAlgorithm());
+            
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(kmf.getKeyManagers(), null, null);
+            log.info("🔒 TLS: SSLContext initialized with TLS protocol");
             return context;
         } catch (Exception e) {
+            log.error("🔒 TLS: Failed to initialize SSLContext", e);
             throw new IllegalStateException("Unable to initialize SSLContext", e);
         }
     }
@@ -57,26 +65,52 @@ public class SecureChatServer implements Runnable, AutoCloseable {
         try {
             SSLServerSocketFactory factory = sslContext.getServerSocketFactory();
             serverSocket = (SSLServerSocket) factory.createServerSocket(port);
-            log.info("TLS Chat Server started on port {}", port);
+            
+            // Log enabled cipher suites
+            String[] enabledCiphers = serverSocket.getEnabledCipherSuites();
+            String[] enabledProtocols = serverSocket.getEnabledProtocols();
+            log.info("🔒 TLS Chat Server started on port {}", port);
+            log.info("🔒 TLS: Enabled cipher suites ({}): {}", enabledCiphers.length, 
+                String.join(", ", Arrays.copyOf(enabledCiphers, Math.min(3, enabledCiphers.length))) + 
+                (enabledCiphers.length > 3 ? "..." : ""));
+            log.info("🔒 TLS: Enabled protocols: {}", String.join(", ", enabledProtocols));
+            log.info("🔒 TLS: Server ready to accept secure connections on port {}", port);
+            System.out.println("═══════════════════════════════════════════════════════════");
+            System.out.println("🔒 TLS CHAT SERVER IS RUNNING");
+            System.out.println("   Port: " + port);
+            System.out.println("   Protocols: " + String.join(", ", enabledProtocols));
+            System.out.println("   Status: Waiting for TLS client connections...");
+            System.out.println("   To test: Connect a TLS client to localhost:" + port);
+            System.out.println("═══════════════════════════════════════════════════════════");
             
             while (running) {
                 try {
                     SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                    String clientId = "client-" + clientCounter.incrementAndGet();
+                    log.info("🔒 TLS: Incoming connection from {} (client: {})", 
+                        clientSocket.getRemoteSocketAddress(), clientId);
+                    log.debug("🔒 TLS: Starting handshake for client {}", clientId);
+                    
+                    // Start TLS handshake
                     clientSocket.startHandshake();
                     
-                    String clientId = "client-" + clientCounter.incrementAndGet();
-                    log.info("New TLS client connected: {} from {}", clientId, clientSocket.getRemoteSocketAddress());
+                    // Log TLS connection details after handshake
+                    String protocol = clientSocket.getSession().getProtocol();
+                    String cipherSuite = clientSocket.getSession().getCipherSuite();
+                    log.info("🔒 TLS HANDSHAKE COMPLETE: Client {} connected", clientId);
+                    log.info("🔒 TLS: Protocol: {}, Cipher Suite: {}", protocol, cipherSuite);
+                    log.info("🔒 TLS: Connection encrypted and authenticated");
                     
                     TlsChatClientHandler handler = new TlsChatClientHandler(clientSocket, clientId, messageHandler);
                     clientPool.submit(handler);
                 } catch (IOException e) {
                     if (running) {
-                        log.error("Error accepting client connection", e);
+                        log.error("🔒 TLS: Error accepting client connection", e);
                     }
                 }
             }
         } catch (IOException e) {
-            log.error("Could not start TLS Chat Server on port {}", port, e);
+            log.error("🔒 TLS: Could not start TLS Chat Server on port {}", port, e);
         } finally {
             clientPool.shutdown();
         }
@@ -89,6 +123,6 @@ public class SecureChatServer implements Runnable, AutoCloseable {
             serverSocket.close();
         }
         clientPool.shutdownNow();
-        log.info("TLS Chat Server shut down");
+        log.info("🔒 TLS Chat Server shut down");
     }
 }

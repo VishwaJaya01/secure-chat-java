@@ -33,6 +33,13 @@ public class TlsChatClientHandler implements Runnable {
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))
         ) {
+            // Log TLS session details
+            javax.net.ssl.SSLSession session = socket.getSession();
+            log.debug("🔒 TLS: Session ID: {}", 
+                session.getId() != null ? bytesToHex(session.getId()) : "null");
+            log.debug("🔒 TLS: Peer certificates: {}", 
+                session.getPeerCertificates() != null ? session.getPeerCertificates().length : 0);
+            
             // Send welcome message
             writer.write("Welcome to Secure Chat Server. Please identify yourself with: USER <username>");
             writer.newLine();
@@ -52,7 +59,7 @@ public class TlsChatClientHandler implements Runnable {
                         writer.flush();
                         continue;
                     }
-                    log.info("Client {} identified as: {}", clientId, username);
+                    log.info("🔒 TLS: Client {} identified as: {} (encrypted connection)", clientId, username);
                     writer.write("OK: You are now identified as " + username);
                     writer.newLine();
                     writer.flush();
@@ -72,13 +79,13 @@ public class TlsChatClientHandler implements Runnable {
                     }
                     
                     Message message = new Message(username, content, Instant.now());
-                    log.info("Received message from {}: {}", username, content);
+                    log.info("🔒 TLS: Encrypted message received from {}: {}", username, content);
                     messageBroadcaster.accept(message);
                     writer.write("OK: Message sent");
                     writer.newLine();
                     writer.flush();
                 } else if (line.equals("QUIT")) {
-                    log.info("Client {} ({}) disconnected", clientId, username);
+                    log.info("🔒 TLS: Client {} ({}) disconnected (TLS session closed)", clientId, username);
                     writer.write("BYE");
                     writer.newLine();
                     writer.flush();
@@ -90,14 +97,27 @@ public class TlsChatClientHandler implements Runnable {
                 }
             }
         } catch (IOException e) {
-            log.warn("Error handling client {}: {}", clientId, e.getMessage());
+            log.warn("🔒 TLS: Error handling client {}: {}", clientId, e.getMessage());
         } finally {
             try {
                 socket.close();
+                log.debug("🔒 TLS: Socket closed for client {}", clientId);
             } catch (IOException e) {
-                log.error("Error closing socket for client {}", clientId, e);
+                log.error("🔒 TLS: Error closing socket for client {}", clientId, e);
             }
         }
     }
+    
+    private String bytesToHex(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return "empty";
+        }
+        StringBuilder hex = new StringBuilder();
+        for (int i = 0; i < Math.min(bytes.length, 8); i++) {
+            hex.append(String.format("%02x", bytes[i]));
+        }
+        return hex.toString() + (bytes.length > 8 ? "..." : "");
+    }
 }
+
 

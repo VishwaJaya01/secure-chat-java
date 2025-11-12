@@ -57,3 +57,4 @@ WHERE NOT EXISTS (SELECT 1 FROM chat_users WHERE user_id = 'admin');
 
 
 
+

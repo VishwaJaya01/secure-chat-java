@@ -28,13 +28,19 @@ public class AnnouncementService {
      * The in-memory store will handle broadcasting to SSE clients.
      */
     public Announcement createAnnouncement(String author, String title, String content) {
+        log.info("   └─ [SERVICE] AnnouncementService.createAnnouncement() - Creating announcement");
+        log.info("      → [SERVICE] Calling InMemoryAnnouncementStore.addAnnouncement()");
+        
         // Add to the in-memory store, which also handles SSE broadcasting
         Announcement announcement = announcementStore.addAnnouncement(author, title, content);
 
+        log.info("      → [SERVICE] Broadcasting to NIO Gateway (AnnouncementBroadcastHub)");
         // Broadcast to the external NIO gateway
         broadcastHub.broadcast(announcement);
 
-        log.info("Created and broadcasted announcement via NIO Hub: #{} by {}", announcement.getId(), author);
+        log.info("📢 ANNOUNCEMENT CREATED: #{} '{}' by {} (broadcast via NIO + SSE)", 
+            announcement.getId(), title, author);
+        log.info("   └─ [SERVICE] AnnouncementService.createAnnouncement() - Completed");
 
         return announcement;
     }

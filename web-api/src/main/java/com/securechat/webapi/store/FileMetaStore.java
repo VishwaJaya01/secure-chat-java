@@ -59,7 +59,13 @@ public class FileMetaStore {
         emitter.onCompletion(() -> emitters.remove(emitter));
         emitter.onTimeout(() -> emitters.remove(emitter));
         emitter.onError(e -> {
-            log.warn("SSE emitter error: {}", e.getMessage());
+            // Normal disconnection - log as debug
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && (errorMsg.contains("aborted") || errorMsg.contains("reset") || errorMsg.contains("closed"))) {
+                log.debug("SSE client disconnected (files stream): {}", errorMsg);
+            } else {
+                log.warn("SSE emitter unexpected error (files stream): {}", errorMsg);
+            }
             emitters.remove(emitter);
         });
         return emitter;

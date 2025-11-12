@@ -28,6 +28,8 @@ public class InMemoryAnnouncementStore {
      * Adds a new announcement to the store and broadcasts it to all listeners.
      */
     public Announcement addAnnouncement(String author, String title, String content) {
+        log.info("      └─ [STORE] InMemoryAnnouncementStore.addAnnouncement() - Storing in memory");
+        
         Announcement announcement = new Announcement(
                 sequence.incrementAndGet(),
                 author,
@@ -36,8 +38,12 @@ public class InMemoryAnnouncementStore {
                 Instant.now()
         );
         announcements.add(0, announcement); // Add to the front of the list
-        log.info("New announcement added: #{} by {}", announcement.getId(), announcement.getAuthor());
+        log.info("      → Announcement stored with ID: #{}", announcement.getId());
+        
+        log.info("      → [SERVICE] Broadcasting to SSE clients");
         broadcast(announcement);
+        
+        log.info("      └─ [STORE] InMemoryAnnouncementStore.addAnnouncement() - Completed");
         return announcement;
     }
 
@@ -74,15 +80,16 @@ public class InMemoryAnnouncementStore {
      * Broadcasts an announcement to all registered SSE emitters.
      */
     private void broadcast(Announcement announcement) {
+        log.info("         → Active SSE emitters: {}", sseEmitters.size());
         sseEmitters.removeIf(emitter -> {
             try {
                 emitter.send(SseEmitter.event().name("announcement").data(announcement));
                 return false; // Keep emitter
             } catch (Exception e) {
-                log.warn("SSE emitter failed, removing it: {}", e.getMessage());
+                log.debug("         → Removing stale SSE emitter: {}", e.getMessage());
                 return true; // Remove emitter
             }
         });
-        log.info("Broadcasted announcement #{} to {} SSE emitters.", announcement.getId(), sseEmitters.size());
+        log.info("         → Broadcasted announcement #{} to {} SSE client(s)", announcement.getId(), sseEmitters.size());
     }
 }

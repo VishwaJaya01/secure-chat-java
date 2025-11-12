@@ -13,3 +13,4 @@ public interface LinkPreviewRepository extends JpaRepository<LinkPreviewEntity, 
 
 
 
+
