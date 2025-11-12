@@ -1,6 +1,7 @@
 package com.securechat.webapi.controller;
 
 import com.securechat.webapi.entity.MessageEntity;
+import com.securechat.webapi.service.ChatBroadcastService;
 import com.securechat.webapi.service.ChatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -10,18 +11,18 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "http://localhost:5173")
 public class ChatController {
     private final ChatService chatService;
-    private final List<SseEmitter> sseEmitters = new CopyOnWriteArrayList<>();
+    private final ChatBroadcastService chatBroadcastService;
 
     @Autowired
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, ChatBroadcastService chatBroadcastService) {
         this.chatService = chatService;
+        this.chatBroadcastService = chatBroadcastService;
     }
 
     @PostMapping("/send")
@@ -29,18 +30,14 @@ public class ChatController {
             @RequestParam String username,
             @RequestParam String text) {
         MessageEntity message = chatService.sendMessage(username, text);
-        broadcastToSseClients(message);
+        chatBroadcastService.broadcastMessage(message);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamMessages(@RequestParam(required = false) String u) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-        sseEmitters.add(emitter);
-
-        emitter.onCompletion(() -> sseEmitters.remove(emitter));
-        emitter.onTimeout(() -> sseEmitters.remove(emitter));
-        emitter.onError((ex) -> sseEmitters.remove(emitter));
+        chatBroadcastService.registerEmitter(emitter);
 
         // Send recent messages
         try {
@@ -56,18 +53,7 @@ public class ChatController {
 
         return emitter;
     }
-
-    private void broadcastToSseClients(MessageEntity message) {
-        sseEmitters.removeIf(emitter -> {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("message")
-                        .data(message));
-                return false;
-            } catch (IOException e) {
-                return true;
-            }
-        });
-    }
 }
+
+
 

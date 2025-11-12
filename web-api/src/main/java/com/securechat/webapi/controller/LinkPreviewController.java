@@ -18,7 +18,7 @@ public class LinkPreviewController {
         this.linkPreviewService = linkPreviewService;
     }
 
-    @PostMapping("/preview")
+    @GetMapping("/preview")
     public ResponseEntity<LinkPreviewEntity> getPreview(@RequestParam String url) {
         try {
             LinkPreviewEntity preview = linkPreviewService.getOrFetchPreview(url);
@@ -32,4 +32,6 @@ public class LinkPreviewController {
         }
     }
 }
+
+
 

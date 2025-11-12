@@ -11,3 +11,5 @@ public interface AnnouncementRepository extends JpaRepository<AnnouncementEntity
     List<AnnouncementEntity> findAllByOrderByCreatedAtDesc();
 }
 
+
+

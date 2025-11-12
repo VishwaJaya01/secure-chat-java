@@ -11,3 +11,5 @@ public interface LinkPreviewRepository extends JpaRepository<LinkPreviewEntity, 
     Optional<LinkPreviewEntity> findByUrl(String url);
 }
 
+
+

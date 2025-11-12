@@ -11,3 +11,5 @@ public interface MessageRepository extends JpaRepository<MessageEntity, Long> {
     List<MessageEntity> findTop200ByOrderByCreatedAtDesc();
 }
 
+
+

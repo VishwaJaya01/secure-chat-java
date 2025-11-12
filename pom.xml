@@ -23,6 +23,7 @@
         <module>udp-presence</module>
         <module>announcement-nio</module>
         <module>web-api</module>
+        <module>file-tcp</module>
     </modules>
 
     <properties>

@@ -17,12 +17,21 @@ export const ChatPage = ({ username }: ChatPageProps) => {
     setStatus('connecting');
     const eventSource = new EventSource(`${import.meta.env.VITE_CHAT_API_URL ?? '/api'}/stream?u=${username}`);
 
+    // Set status to open when connection is established
     eventSource.onopen = () => {
       setStatus('open');
       setError(null);
     };
 
+    // Also set status to open when we receive the first message (connection is working)
+    let firstMessageReceived = false;
     eventSource.addEventListener('message', (event) => {
+      if (!firstMessageReceived) {
+        firstMessageReceived = true;
+        setStatus('open');
+        setError(null);
+      }
+      
       try {
         const data = JSON.parse(event.data);
         const message: ChatMessage = {
@@ -32,15 +41,29 @@ export const ChatPage = ({ username }: ChatPageProps) => {
           createdAt: data.createdAt,
           mine: data.author === username,
         };
-        setMessages((prev) => [message, ...prev].slice(0, 200));
+        
+        setMessages((prev) => {
+          // Check if message already exists (avoid duplicates)
+          if (prev.some(m => m.id === message.id)) {
+            return prev;
+          }
+          // Add new message and sort by createdAt (oldest first)
+          const updated = [...prev, message];
+          return updated
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+            .slice(-200); // Keep last 200 messages
+        });
       } catch (err) {
         console.error('Failed to parse message:', err);
       }
     });
 
-    eventSource.onerror = () => {
-      setStatus('error');
-      setError('Connection error');
+    eventSource.onerror = (err) => {
+      // Only set error status if connection is actually broken
+      if (eventSource.readyState === EventSource.CLOSED) {
+        setStatus('error');
+        setError('Connection error');
+      }
     };
 
     return () => {
@@ -77,7 +100,7 @@ export const ChatPage = ({ username }: ChatPageProps) => {
         </div>
       )}
       <MessageList messages={messages} />
-      <MessageComposer disabled={status !== 'open'} onSend={handleSend} />
+      <MessageComposer disabled={status === 'error'} onSend={handleSend} />
     </div>
   );
 };
