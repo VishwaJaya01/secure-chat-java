@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -10,23 +9,11 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>file-tcp</artifactId>
-    <name>file-tcp</name>
+    <artifactId>task-monitor</artifactId>
+    <name>task-monitor</name>
     <packaging>jar</packaging>
 
-    <properties>
-        <java.version>17</java.version>
-    </properties>
-
     <dependencies>
-        <!-- Project Modules -->
-        <dependency>
-            <groupId>com.securechat</groupId>
-            <artifactId>chat-core</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -54,14 +41,14 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.2.0</version>
                 <configuration>
-                    <mainClass>com.securechat.tcp.FileTcpServerMain</mainClass>
+                    <mainClass>com.securechat.task.TaskSseMonitor</mainClass>
                 </configuration>
                 <executions>
                     <execution>
                         <id>default-cli</id>
                         <configuration>
                             <skip>false</skip>
-                            <mainClass>com.securechat.tcp.FileTcpServerMain</mainClass>
+                            <mainClass>com.securechat.task.TaskSseMonitor</mainClass>
                         </configuration>
                     </execution>
                 </executions>

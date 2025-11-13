@@ -34,11 +34,12 @@ function App() {
           // Backend might not be running
         });
         // Update presence periodically (with error handling)
+        const heartbeatIntervalMs = Math.max(5000, Number(import.meta.env.VITE_HEARTBEAT_INTERVAL_MS ?? '15000') || 15000);
         const interval = setInterval(() => {
           api.updatePresence(savedUsername, savedUsername).catch(() => {
             // Silently fail - backend might not be running
           });
-        }, 5000);
+        }, heartbeatIntervalMs);
         return () => clearInterval(interval);
       }
     } catch (error) {

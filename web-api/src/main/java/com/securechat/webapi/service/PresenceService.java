@@ -2,9 +2,12 @@ package com.securechat.webapi.service;
 
 import com.securechat.webapi.entity.UserEntity;
 import com.securechat.webapi.repository.UserRepository;
+import com.securechat.webapi.telemetry.NetworkServiceKeys;
+import com.securechat.webapi.telemetry.NetworkServiceRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,22 +15,37 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Service
 public class PresenceService {
     private static final Logger log = LoggerFactory.getLogger(PresenceService.class);
     private static final long ONLINE_THRESHOLD_SECONDS = 10;
     private static final long IDLE_THRESHOLD_SECONDS = 30;
-    private static final long ONLINE_MEMBERS_LOG_INTERVAL_SECONDS = 5; // Log online members every 5 seconds
 
     private final UserRepository userRepository;
+    private final NetworkServiceRegistry networkServiceRegistry;
+    private final int udpPresencePort;
+    private final int httpPort;
+    private final long summaryLogIntervalMs;
+    private final int httpPresenceTelemetryLogEvery;
     private final AtomicLong lastOnlineMembersLogTime = new AtomicLong(0);
+    private final AtomicLong httpTelemetryCounter = new AtomicLong(0);
 
     @Autowired
-    public PresenceService(UserRepository userRepository) {
+    public PresenceService(UserRepository userRepository,
+                           NetworkServiceRegistry networkServiceRegistry,
+                           @Value("${udp.presence.port:9090}") int udpPresencePort,
+                           @Value("${server.port:8080}") int httpPort,
+                           @Value("${presence.http.telemetry.log-every:30}") int httpPresenceTelemetryLogEvery,
+                           @Value("${presence.summary.log-interval-seconds:45}") long summaryLogIntervalSeconds) {
         this.userRepository = userRepository;
+        this.networkServiceRegistry = networkServiceRegistry;
+        this.udpPresencePort = udpPresencePort;
+        this.httpPort = httpPort;
+        this.httpPresenceTelemetryLogEvery = Math.max(1, httpPresenceTelemetryLogEvery);
+        this.summaryLogIntervalMs = Math.max(1, summaryLogIntervalSeconds) * 1000;
     }
 
     @Transactional
@@ -54,6 +72,22 @@ public class PresenceService {
             log.info("   └─ [SERVICE] PresenceService.updatePresence() - Updating user presence");
             log.info("      → Using UserRepository (JPA/Hibernate)");
             log.info("      → User presence saved to database");
+        }
+
+        if (isUdpBeacon) {
+            if (isStatusChange) {
+                networkServiceRegistry.recordUsage(
+                    NetworkServiceKeys.UDP_PRESENCE_SERVER,
+                    "UDP-UPDATE",
+                    String.format("%s synchronized from UDP beacon on port %d (status: %s)", display, udpPresencePort, newStatus)
+                );
+            }
+        } else if (shouldEmitHttpTelemetry(isStatusChange)) {
+            networkServiceRegistry.recordUsage(
+                NetworkServiceKeys.UDP_PRESENCE_SERVER,
+                "HTTP-HEARTBEAT",
+                String.format("%s heartbeat accepted via http://localhost:%d/api/presence/beat", display, httpPort)
+            );
         }
         
         // Only log status changes to avoid spam
@@ -83,7 +117,7 @@ public class PresenceService {
         if (!isUdpBeacon || isStatusChange) {
             long currentTime = System.currentTimeMillis();
             long lastLogTime = lastOnlineMembersLogTime.get();
-            if (currentTime - lastLogTime >= ONLINE_MEMBERS_LOG_INTERVAL_SECONDS * 1000) {
+            if (currentTime - lastLogTime >= summaryLogIntervalMs) {
                 if (lastOnlineMembersLogTime.compareAndSet(lastLogTime, currentTime)) {
                     logOnlineMembers();
                 }
@@ -163,6 +197,14 @@ public class PresenceService {
                             }
                         }
                 ));
+    }
+
+    private boolean shouldEmitHttpTelemetry(boolean isStatusChange) {
+        if (isStatusChange) {
+            return true;
+        }
+        long sample = httpTelemetryCounter.incrementAndGet();
+        return httpPresenceTelemetryLogEvery <= 1 || sample % httpPresenceTelemetryLogEvery == 0;
     }
 }
 

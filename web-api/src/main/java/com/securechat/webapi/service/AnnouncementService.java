@@ -3,6 +3,8 @@ package com.securechat.webapi.service;
 import com.securechat.core.Announcement;
 import com.securechat.core.AnnouncementBroadcastHub;
 import com.securechat.webapi.store.InMemoryAnnouncementStore;
+import com.securechat.webapi.telemetry.NetworkServiceKeys;
+import com.securechat.webapi.telemetry.NetworkServiceRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +18,15 @@ public class AnnouncementService {
 
     private final InMemoryAnnouncementStore announcementStore;
     private final AnnouncementBroadcastHub broadcastHub;
+    private final NetworkServiceRegistry networkServiceRegistry;
 
     @Autowired
-    public AnnouncementService(InMemoryAnnouncementStore announcementStore, AnnouncementBroadcastHub broadcastHub) {
+    public AnnouncementService(InMemoryAnnouncementStore announcementStore,
+                               AnnouncementBroadcastHub broadcastHub,
+                               NetworkServiceRegistry networkServiceRegistry) {
         this.announcementStore = announcementStore;
         this.broadcastHub = broadcastHub;
+        this.networkServiceRegistry = networkServiceRegistry;
     }
 
     /**
@@ -37,6 +43,11 @@ public class AnnouncementService {
         log.info("      → [SERVICE] Broadcasting to NIO Gateway (AnnouncementBroadcastHub)");
         // Broadcast to the external NIO gateway
         broadcastHub.broadcast(announcement);
+        networkServiceRegistry.recordUsage(
+            NetworkServiceKeys.NIO_ANNOUNCEMENTS,
+            "BROADCAST",
+            String.format("Announcement #%d '%s' forwarded to NIO clients", announcement.getId(), title)
+        );
 
         log.info("📢 ANNOUNCEMENT CREATED: #{} '{}' by {} (broadcast via NIO + SSE)", 
             announcement.getId(), title, author);
@@ -49,4 +60,3 @@ public class AnnouncementService {
         return announcementStore.getAllAnnouncements();
     }
 }
-

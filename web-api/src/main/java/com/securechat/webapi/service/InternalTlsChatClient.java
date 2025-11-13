@@ -1,8 +1,12 @@
 package com.securechat.webapi.service;
 
+import com.securechat.webapi.telemetry.NetworkServiceKeys;
+import com.securechat.webapi.telemetry.NetworkServiceRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 import javax.net.ssl.SSLContext;
@@ -24,17 +28,30 @@ public class InternalTlsChatClient {
     private final int tlsPort;
     private final String keystorePath;
     private final String keystorePassword;
+    private final ResourceLoader resourceLoader;
+    private final NetworkServiceRegistry networkServiceRegistry;
     private SSLContext sslContext;
 
     public InternalTlsChatClient(
             @Value("${tls.chat.host:localhost}") String tlsHost,
             @Value("${tls.chat.port:9443}") int tlsPort,
             @Value("${tls.chat.keystore.path:./certs/server-keystore.jks}") String keystorePath,
-            @Value("${tls.chat.keystore.password:changeit}") String keystorePassword) {
+            @Value("${tls.chat.keystore.password:changeit}") String keystorePassword,
+            NetworkServiceRegistry networkServiceRegistry,
+            ResourceLoader resourceLoader) {
         this.tlsHost = tlsHost;
         this.tlsPort = tlsPort;
         this.keystorePath = keystorePath;
         this.keystorePassword = keystorePassword;
+        this.networkServiceRegistry = networkServiceRegistry;
+        this.resourceLoader = resourceLoader;
+        networkServiceRegistry.registerService(
+            NetworkServiceKeys.TLS_CHAT_CLIENT,
+            "TLS Chat Router",
+            "TLS",
+            tlsHost + ":" + tlsPort,
+            "Loops HTTP chat traffic back through the TLS server"
+        );
         initializeSslContext();
     }
 
@@ -42,8 +59,8 @@ public class InternalTlsChatClient {
         try {
             // Use the same keystore as the server (for self-signed certs)
             KeyStore trustStore = KeyStore.getInstance("JKS");
-            try (FileInputStream fis = new FileInputStream(keystorePath)) {
-                trustStore.load(fis, keystorePassword.toCharArray());
+            try (InputStream in = resolveKeystoreStream()) {
+                trustStore.load(in, keystorePassword.toCharArray());
             }
             
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -52,9 +69,17 @@ public class InternalTlsChatClient {
             sslContext = SSLContext.getInstance("TLS");
             sslContext.init(null, tmf.getTrustManagers(), null);
             log.info("🔒 TLS: Internal TLS client initialized for routing HTTP messages through TLS");
+            networkServiceRegistry.serviceRunning(
+                NetworkServiceKeys.TLS_CHAT_CLIENT,
+                "Trust store loaded from " + keystorePath
+            );
         } catch (Exception e) {
             log.warn("🔒 TLS: Failed to initialize internal TLS client: {}. Messages will use HTTP only.", e.getMessage());
             sslContext = null;
+            networkServiceRegistry.serviceDegraded(
+                NetworkServiceKeys.TLS_CHAT_CLIENT,
+                "Trust store initialization failed: " + e.getMessage()
+            );
         }
     }
 
@@ -67,6 +92,10 @@ public class InternalTlsChatClient {
         
         if (sslContext == null) {
             log.warn("      → ⚠️  Cannot route message through TLS - SSL context not initialized");
+            networkServiceRegistry.serviceDegraded(
+                NetworkServiceKeys.TLS_CHAT_CLIENT,
+                "Attempted TLS routing without SSL context for user " + username
+            );
             return;
         }
 
@@ -74,6 +103,11 @@ public class InternalTlsChatClient {
             SSLSocketFactory factory = sslContext.getSocketFactory();
             log.info("      → Creating TLS connection to {}:{}", tlsHost, tlsPort);
             log.info("      → Using SSLContext with TrustManagerFactory");
+            networkServiceRegistry.recordUsage(
+                NetworkServiceKeys.TLS_CHAT_CLIENT,
+                "CONNECT",
+                "Opening TLS socket to tls://" + tlsHost + ":" + tlsPort + " for " + username
+            );
             
             try (SSLSocket socket = (SSLSocket) factory.createSocket(tlsHost, tlsPort);
                  BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -85,6 +119,16 @@ public class InternalTlsChatClient {
                 String cipherSuite = socket.getSession().getCipherSuite();
                 log.info("🔒 TLS HANDSHAKE COMPLETE: Internal connection established");
                 log.info("🔒 TLS: Protocol: {}, Cipher Suite: {}", protocol, cipherSuite);
+                networkServiceRegistry.recordUsage(
+                    NetworkServiceKeys.TLS_CHAT_CLIENT,
+                    "HANDSHAKE",
+                    String.format("%s negotiated %s/%s on tls://%s:%d", username, protocol, cipherSuite, tlsHost, tlsPort)
+                );
+                networkServiceRegistry.recordUsage(
+                    NetworkServiceKeys.TLS_CHAT_SERVER,
+                    "HANDSHAKE",
+                    String.format("Internal router connected as %s over port %d", username, tlsPort)
+                );
                 
                 // Read welcome message
                 String welcome = reader.readLine();
@@ -118,10 +162,31 @@ public class InternalTlsChatClient {
                 writer.flush();
                 
                 log.info("🔒 TLS: Internal TLS connection closed");
+                networkServiceRegistry.recordUsage(
+                    NetworkServiceKeys.TLS_CHAT_CLIENT,
+                    "CLOSE",
+                    "TLS socket closed for " + username
+                );
             }
         } catch (Exception e) {
             log.warn("🔒 TLS: Failed to route message through TLS: {}. Message will be processed via HTTP.", e.getMessage());
+            networkServiceRegistry.serviceDegraded(
+                NetworkServiceKeys.TLS_CHAT_CLIENT,
+                "TLS routing failed for " + username + ": " + e.getMessage()
+            );
         }
+    }
+
+    private InputStream resolveKeystoreStream() throws IOException {
+        Resource resource = resourceLoader.getResource(keystorePath);
+        if (!resource.exists() && !keystorePath.startsWith("classpath:")) {
+            resource = resourceLoader.getResource("file:" + keystorePath);
+        }
+        if (!resource.exists()) {
+            throw new FileNotFoundException("Keystore not found at " + keystorePath);
+        }
+        log.info("🔒 TLS: Loading client trust store from {}", resource.getDescription());
+        return resource.getInputStream();
     }
 }
 

@@ -2,6 +2,8 @@ package com.securechat.webapi.controller;
 
 import com.securechat.webapi.entity.LinkPreviewEntity;
 import com.securechat.webapi.service.LinkPreviewService;
+import com.securechat.webapi.telemetry.LinkPreviewEventBus;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,10 +17,13 @@ import org.springframework.web.bind.annotation.*;
 public class LinkPreviewController {
     private static final Logger log = LoggerFactory.getLogger(LinkPreviewController.class);
     private final LinkPreviewService linkPreviewService;
+    private final LinkPreviewEventBus eventBus;
 
     @Autowired
-    public LinkPreviewController(LinkPreviewService linkPreviewService) {
+    public LinkPreviewController(LinkPreviewService linkPreviewService,
+                                 LinkPreviewEventBus eventBus) {
         this.linkPreviewService = linkPreviewService;
+        this.eventBus = eventBus;
     }
 
     @GetMapping("/preview")
@@ -36,6 +41,11 @@ public class LinkPreviewController {
             log.error("🔗 LINK PREVIEW (API REQUEST ERROR): {} - {}", url, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    @GetMapping(value = "/preview/stream", produces = "text/event-stream")
+    public SseEmitter streamLinkEvents() {
+        return eventBus.register();
     }
 }
 

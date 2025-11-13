@@ -37,7 +37,7 @@ This project demonstrates:
 secure-chat-java/
 ├─ chat-core/            # Domain primitives and registries
 ├─ web-api/              # Spring Boot REST API (main backend)
-├─ announcement-nio/     # NIO announcement gateway (port 6001)
+├─ announcement-nio/     # NIO announcement gateway (port 8181)
 ├─ chat-tcp/             # TCP file transfer (port 6000)
 ├─ chat-secure/          # TLS-enabled components
 ├─ udp-presence/         # UDP presence beacons (port 9090)
@@ -85,6 +85,51 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`
 
+### Standalone Service Consoles
+
+To demo each network service in its own terminal, stay at the project root and use the pre-wired `exec:java` targets:
+
+```bash
+# TLS chat server (port 9443 by default)
+mvn -pl chat-secure -am exec:java
+
+# TLS chat CLI (override the main class + args as needed)
+mvn -pl chat-secure -am -Dexec.mainClass=com.securechat.secure.SecureChatCli \
+    -Dexec.args="--user=demo --truststore=classpath:certs/server-keystore.jks" exec:java
+# Web/api starts first, then web-app, then the TLS server. Because
+# `tls.chat.embedded=false` by default, Spring Boot will wait for the standalone
+# chat-secure process you launch here.
+
+# TCP file server (port 6000, stores files under ./files)
+mvn -pl file-tcp -am exec:java
+# To just mirror uploads without binding the port: 
+#   mvn -pl file-tcp -am -Dexec.args="--monitor-only --sse-url=http://localhost:8080/api/files/stream" exec:java
+
+# Task board SSE monitor (read-only console)
+mvn -pl task-monitor -am exec:java
+# Override stream URL if needed:
+#   mvn -pl task-monitor -am -Dexec.args="--sse-url=http://localhost:8080/api/tasks/stream" exec:java
+
+# Link preview monitor (URI safety feed)
+mvn -pl link-preview-monitor -am exec:java
+# Override stream URL if needed:
+#   mvn -pl link-preview-monitor -am -Dexec.args="--sse-url=http://localhost:8080/api/link/preview/stream" exec:java
+
+# UDP presence broadcaster + listener (single console demo)
+mvn -pl udp-presence -am exec:java
+# To run a single role:
+#   mvn -pl udp-presence -am -Dexec.mainClass=com.securechat.udp.PresenceServerMain exec:java
+#   mvn -pl udp-presence -am -Dexec.mainClass=com.securechat.udp.PresenceClientMain exec:java
+
+# Announcement NIO gateway (8081) mirroring API SSE stream
+mvn -pl announcement-nio -am -Dexec.args="--port=8081 --sse-url=http://localhost:8080/api/announcements/stream" exec:java
+# Use --no-sse if you only want raw TCP clients without mirroring
+```
+
+> ❗ Maven properties such as `-Dexec.args="..."` must come **before** `exec:java` when you need to override defaults.
+
+Each launcher understands `--port=`, `--dir=` (file server), or `--server-id=` (UDP) switches so you can match whatever the Spring Boot app expects.
+
 ---
 
 ## Features & Endpoints
@@ -98,7 +143,7 @@ The frontend will be available at `http://localhost:5173`
 - `GET /api/announcements` - Get all announcements
 - `GET /api/announcements/{id}` - Get announcement by ID
 - `GET /api/announcements/stream` - SSE stream of announcements
-- **NIO Gateway**: Port 6001 (non-blocking selector)
+- **NIO Gateway**: Port 8181 inside Spring Boot, or run standalone on 8081 bridged via SSE (`--sse-url`) for separate terminal logs.
 
 ### Tasks (Member B - Multithreading)
 - `GET /api/tasks` - Get all tasks
@@ -107,21 +152,27 @@ The frontend will be available at `http://localhost:5173`
 - `DELETE /api/tasks/{id}` - Delete a task
 - `GET /api/tasks/stream` - SSE stream of tasks
 - **Background Workers**: ExecutorService (to be implemented)
+- **Standalone monitor**: `mvn -pl task-monitor -am exec:java` tails the SSE feed so task lifecycle events appear in their own console.
 
 ### Files (Member A - TCP)
 - `GET /api/files` - Get all files
 - `GET /api/files/{id}` - Get file metadata
 - `POST /api/files/meta` - Create file metadata
-- **TCP Server**: Port 6000 (file transfer)
+- **TCP Server**: Port 6000 (file transfer). Embedded server starts automatically unless an external instance is already running; override with `file.transfer.embedded=false`. The standalone CLI falls back to SSE monitor mode if the port is busy so you can still watch transfers.
 
 ### Presence (Member E - UDP)
 - `GET /api/users` - Get all users
 - `GET /api/users/status` - Get user status map
 - `POST /api/presence/beat` - Update user presence
 - **UDP Server**: Port 9090 (presence beacons)
+- **Noise controls**: tune `presence.http.log-every`, `presence.http.telemetry.log-every`, and `presence.summary.log-interval-seconds` (default throttled for demos).  
+- **Standalone demos**: `mvn -pl udp-presence -am exec:java` (runs both server + listener together with online roster), or override `-Dexec.mainClass` for server-only (`PresenceServerMain`) / listener-only (`PresenceClientMain`).
+  Frontend polling interval is configurable via `VITE_HEARTBEAT_INTERVAL_MS`.
 
 ### Link Previews (Member E - URL/URI)
 - `POST /api/link/preview?url=<url>` - Get link preview
+- `GET /api/link/preview/stream` - SSE stream of preview activity (cache hits, fetches, rejections)
+- **Standalone monitor**: `mvn -pl link-preview-monitor -am exec:java`
 
 ---
 
@@ -131,7 +182,7 @@ The frontend will be available at `http://localhost:5173`
 |---------|------|-------|
 | React dev server | 5173 | Vite + React frontend |
 | Spring Boot API | 8080 | REST + SSE endpoints |
-| NIO Gateway | 6001 | Announcement broadcasting |
+| NIO Gateway | 8181 | Announcement broadcasting |
 | TCP File Server | 6000 | File transfer (Member A) |
 | UDP Presence | 9090 | Presence beacons (Member E) |
 | TLS File Server | 6443 | Secure file transfer (Member D) |
@@ -207,6 +258,7 @@ cd web-api
 **Deliverables**:
 - TLS file server on port 6443
 - TLS announcement gateway (optional)
+- Embedded TLS chat server can be disabled with `tls.chat.embedded=false` when you want to showcase the standalone `chat-secure` process.
 - HTTPS API on port 8443
 - Keystores/truststores management
 - Cipher/handshake policy
@@ -233,7 +285,7 @@ The NIO gateway demonstrates non-blocking I/O using Java NIO Selector.
 
 ### How It Works
 
-1. Gateway starts on port 6001
+1. Gateway starts on port 8181
 2. Uses a single-threaded selector to handle multiple clients
 3. When an announcement is created via REST API:
    - AnnouncementService saves to database
@@ -255,7 +307,7 @@ The NIO gateway demonstrates non-blocking I/O using Java NIO Selector.
 
 The gateway logs selector events for debugging:
 ```
-INFO  - NIO AnnouncementGateway started on port 6001
+INFO  - NIO AnnouncementGateway started on port 8181
 INFO  - Client connected: /127.0.0.1:54321 (total: 1)
 INFO  - Broadcasted announcement to 1 clients
 ```
@@ -295,7 +347,7 @@ spring.datasource.username=sa
 spring.datasource.password=
 
 # NIO Gateway
-nio.gateway.port=6001
+nio.gateway.port=8181
 nio.gateway.enabled=true
 
 # UDP Presence
@@ -314,7 +366,7 @@ file.transfer.enabled=true
 - **Port already in use**: Use `lsof -i :<port>` (macOS/Linux) or `netstat -ano | findstr :<port>` (Windows)
 - **SSE stream appears idle**: Verify the endpoint is reachable and messages are being sent
 - **Database errors**: Check that H2 database file has write permissions
-- **NIO gateway not starting**: Check port 6001 is available and logs for errors
+- **NIO gateway not starting**: Check port 8181 is available and logs for errors
 - **Admin user not found**: The admin user is created automatically in the database migration
 
 ---
@@ -324,7 +376,7 @@ file.transfer.enabled=true
 ### ✅ Member C - NIO Announcements (COMPLETE)
 
 **What's Implemented**:
-- ✅ NIO Gateway with Selector on port 6001
+- ✅ NIO Gateway with Selector on port 8181
 - ✅ Single-threaded selector handles multiple clients
 - ✅ AnnouncementBroadcastHub for fan-out
 - ✅ REST endpoints: POST/GET /api/announcements
@@ -332,7 +384,7 @@ file.transfer.enabled=true
 - ✅ Admin validation and database persistence
 - ✅ React frontend integration
 
-**Flow**: Admin creates announcement → Service → BroadcastHub → NIO Gateway (port 6001) + SSE (React)
+**Flow**: Admin creates announcement → Service → BroadcastHub → NIO Gateway (port 8181) + SSE (React)
 
 ### ✅ Other Services (INITIATED - Ready for Implementation)
 

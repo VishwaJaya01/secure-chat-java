@@ -5,11 +5,13 @@ import com.securechat.webapi.service.PresenceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/api")
@@ -17,10 +19,14 @@ import java.util.Map;
 public class PresenceController {
     private static final Logger log = LoggerFactory.getLogger(PresenceController.class);
     private final PresenceService presenceService;
+    private final int httpLogEvery;
+    private final AtomicLong logCounter = new AtomicLong(0);
 
     @Autowired
-    public PresenceController(PresenceService presenceService) {
+    public PresenceController(PresenceService presenceService,
+                              @Value("${presence.http.log-every:40}") int httpLogEvery) {
         this.presenceService = presenceService;
+        this.httpLogEvery = Math.max(1, httpLogEvery);
     }
 
     @GetMapping("/users")
@@ -39,17 +45,29 @@ public class PresenceController {
     public ResponseEntity<Void> updatePresence(
             @RequestParam String userId,
             @RequestParam(required = false) String displayName) {
-        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        log.info("📥 [CONTROLLER] PresenceController.updatePresence() - HTTP POST /api/presence/beat");
-        log.info("   → Service Flow: PresenceController → PresenceService");
-        log.info("   → Parameters: userId={}, displayName={}", userId, displayName);
-        log.info("   → [SERVICE] Calling PresenceService.updatePresence()");
+        boolean logRequest = shouldLogThisHeartbeat();
+        if (logRequest) {
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.info("📥 [CONTROLLER] PresenceController.updatePresence() - HTTP POST /api/presence/beat");
+            log.info("   → Service Flow: PresenceController → PresenceService");
+            log.info("   → Parameters: userId={}, displayName={}", userId, displayName);
+            log.info("   → [SERVICE] Calling PresenceService.updatePresence()");
+        } else {
+            log.debug("📥 Presence heartbeat userId={} displayName={}", userId, displayName);
+        }
         
         presenceService.updatePresence(userId, displayName);
         
-        log.info("✅ [CONTROLLER] PresenceController.updatePresence() - Request completed");
-        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        if (logRequest) {
+            log.info("✅ [CONTROLLER] PresenceController.updatePresence() - Request completed");
+            log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        }
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean shouldLogThisHeartbeat() {
+        long count = logCounter.incrementAndGet();
+        return httpLogEvery <= 1 || count % httpLogEvery == 1;
     }
 }
 

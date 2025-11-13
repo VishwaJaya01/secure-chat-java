@@ -4,6 +4,7 @@ import com.securechat.core.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSocket;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -35,10 +36,16 @@ public class TlsChatClientHandler implements Runnable {
         ) {
             // Log TLS session details
             javax.net.ssl.SSLSession session = socket.getSession();
-            log.debug("🔒 TLS: Session ID: {}", 
+            log.debug("🔒 TLS: Session ID: {}",
                 session.getId() != null ? bytesToHex(session.getId()) : "null");
-            log.debug("🔒 TLS: Peer certificates: {}", 
-                session.getPeerCertificates() != null ? session.getPeerCertificates().length : 0);
+            int peerCertCount = 0;
+            try {
+                var peerCerts = session.getPeerCertificates();
+                peerCertCount = peerCerts != null ? peerCerts.length : 0;
+            } catch (SSLPeerUnverifiedException ex) {
+                log.debug("🔒 TLS: Client {} did not present certificates (mutual TLS not required)", clientId);
+            }
+            log.debug("🔒 TLS: Peer certificates: {}", peerCertCount);
             
             // Send welcome message
             writer.write("Welcome to Secure Chat Server. Please identify yourself with: USER <username>");

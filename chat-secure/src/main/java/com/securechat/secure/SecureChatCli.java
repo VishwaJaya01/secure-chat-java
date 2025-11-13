@@ -32,12 +32,13 @@ import java.util.Scanner;
  */
 public class SecureChatCli {
     private static final Logger log = LoggerFactory.getLogger(SecureChatCli.class);
+    private static final String DEFAULT_TRUSTSTORE_CLASSPATH = "certs/server-keystore.jks";
 
     public static void main(String[] args) throws IOException {
         String host = "localhost";
         int port = 9443;
         String truststoreLocation = null;
-        String truststoreType = "PKCS12";
+        String truststoreType = "JKS";
         char[] password = "changeit".toCharArray();
         String user = "guest";
 
@@ -59,6 +60,8 @@ public class SecureChatCli {
         }
 
         SSLSocketFactory factory = createSocketFactory(truststoreLocation, password.clone(), truststoreType);
+        Arrays.fill(password, '\0');
+
         try (SSLSocket socket = (SSLSocket) factory.createSocket(host, port);
              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
@@ -127,6 +130,11 @@ public class SecureChatCli {
 
     private static SSLSocketFactory createSocketFactory(String truststoreLocation, char[] password, String truststoreType) {
         if (truststoreLocation == null) {
+            SSLSocketFactory fromClasspath = loadFromClasspath(password, truststoreType);
+            if (fromClasspath != null) {
+                return fromClasspath;
+            }
+            log.warn("No explicit truststore provided and classpath resource {} not found; falling back to JVM defaults", DEFAULT_TRUSTSTORE_CLASSPATH);
             return (SSLSocketFactory) SSLSocketFactory.getDefault();
         }
 
@@ -136,15 +144,33 @@ public class SecureChatCli {
         }
 
         try (InputStream in = Files.newInputStream(path)) {
+            return buildSocketFactory(in, password, truststoreType);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to initialise SSL context from truststore " + truststoreLocation, e);
+        }
+    }
+
+    private static SSLSocketFactory loadFromClasspath(char[] password, String truststoreType) {
+        try (InputStream in = SecureChatCli.class.getClassLoader().getResourceAsStream(DEFAULT_TRUSTSTORE_CLASSPATH)) {
+            if (in == null) {
+                return null;
+            }
+            log.info("Loading TLS truststore from classpath: {}", DEFAULT_TRUSTSTORE_CLASSPATH);
+            return buildSocketFactory(in, password, truststoreType);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to initialise SSL context from classpath truststore " + DEFAULT_TRUSTSTORE_CLASSPATH, e);
+        }
+    }
+
+    private static SSLSocketFactory buildSocketFactory(InputStream truststoreStream, char[] password, String truststoreType) throws Exception {
+        try {
             KeyStore trustStore = KeyStore.getInstance(truststoreType);
-            trustStore.load(in, password);
+            trustStore.load(truststoreStream, password);
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(trustStore);
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(null, tmf.getTrustManagers(), null);
             return context.getSocketFactory();
-        } catch (Exception e) {
-            throw new IllegalStateException("Unable to initialise SSL context from truststore", e);
         } finally {
             Arrays.fill(password, '\0');
         }

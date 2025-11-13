@@ -166,6 +166,9 @@ public class AnnouncementGateway implements Runnable, AutoCloseable {
         String message = formatAnnouncement(announcement);
         ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
         int sentCount = 0;
+        int connectedCount = connectedChannels.size();
+        log.info("📣 Broadcast queued for announcement '{}' by {} ({} connected clients)",
+                announcement.getTitle(), announcement.getAuthor(), connectedCount);
 
         for (SocketChannel channel : connectedChannels) {
             if (channel.isOpen() && channel.isConnected()) {
@@ -192,6 +195,9 @@ public class AnnouncementGateway implements Runnable, AutoCloseable {
         if (sentCount > 0) {
             selector.wakeup();
             log.info("Broadcasted announcement to {} clients", sentCount);
+        } else {
+            log.info("No active NIO clients when '{}' was broadcast – announcement still delivered via REST/SSE",
+                    announcement.getTitle());
         }
     }
 
@@ -264,4 +270,3 @@ public class AnnouncementGateway implements Runnable, AutoCloseable {
         }
     }
 }
-
