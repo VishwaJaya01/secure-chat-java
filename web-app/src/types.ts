@@ -29,14 +29,12 @@ export interface Task {
 }
 
 export interface File {
-  id: number;
+  fileId: string;
   filename: string;
-  originalFilename: string;
-  contentType?: string;
   fileSize: number;
-  uploader: string;
-  checksum?: string;
-  filePath?: string;
+  owner: string;
+  tcpHost: string;
+  tcpPort: number;
   createdAt: string;
 }
 

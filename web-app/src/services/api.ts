@@ -102,33 +102,49 @@ export const api = {
     return response.json();
   },
 
-  createFileMetadata: async (
-    filename: string,
-    originalFilename: string,
-    contentType: string,
-    fileSize: number,
-    uploader: string,
-    checksum?: string,
-    filePath?: string
-  ) => {
-    const params: Record<string, string> = {
-      filename,
-      originalFilename,
-      contentType: contentType || '',
-      fileSize: fileSize.toString(),
-      uploader,
-    };
-    if (checksum) params.checksum = checksum;
-    if (filePath) params.filePath = filePath;
-    const response = await fetch(toUrl('/files/meta'), {
+  announceFile: async (filename: string, fileSize: number, owner: string, tcpHost: string, tcpPort: number) => {
+    const response = await fetch(toUrl('/files/announce'), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'Content-Type': 'application/json',
       },
-      body: new URLSearchParams(params).toString(),
+      body: JSON.stringify({ filename, fileSize, owner, tcpHost, tcpPort }),
     });
-    if (!response.ok) throw new Error(`Failed to create file metadata: ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to announce file: ${response.status}`);
     return response.json();
+  },
+
+  uploadFile: async (owner: string, file: File) => {
+    const formData = new FormData();
+    formData.append('owner', owner);
+    formData.append('file', file);
+
+    const response = await fetch(toUrl('/files/upload'), {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to upload file: ${response.status}`);
+    }
+    return response;
+  },
+
+  downloadFile: async (fileId: string, filename: string) => {
+    const response = await fetch(toUrl(`/files/${fileId}/download`));
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Failed to download file: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   },
 
   // Presence
@@ -164,4 +180,5 @@ export const api = {
     return response.json();
   },
 };
+
 

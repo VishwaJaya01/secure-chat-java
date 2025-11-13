@@ -62,6 +62,21 @@
             <artifactId>announcement-nio</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.securechat</groupId>
+            <artifactId>file-tcp</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.securechat</groupId>
+            <artifactId>chat-secure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.securechat</groupId>
+            <artifactId>udp-presence</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <!-- JSoup for HTML parsing (link previews) -->
         <dependency>

@@ -2,7 +2,13 @@ package com.securechat.webapi.controller;
 
 import com.securechat.webapi.entity.TaskEntity;
 import com.securechat.webapi.service.TaskService;
+import com.securechat.webapi.telemetry.NetworkServiceKeys;
+import com.securechat.webapi.telemetry.NetworkServiceRegistry;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,12 +23,32 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @RequestMapping("/api/tasks")
 @CrossOrigin(origins = "http://localhost:5173")
 public class TaskController {
+    private static final Logger log = LoggerFactory.getLogger(TaskController.class);
     private final TaskService taskService;
+    private final NetworkServiceRegistry networkServiceRegistry;
+    @Value("${server.port:8080}")
+    private int serverPort;
     private final List<SseEmitter> sseEmitters = new CopyOnWriteArrayList<>();
 
     @Autowired
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, NetworkServiceRegistry networkServiceRegistry) {
         this.taskService = taskService;
+        this.networkServiceRegistry = networkServiceRegistry;
+    }
+
+    @PostConstruct
+    public void registerTelemetry() {
+        networkServiceRegistry.registerService(
+            NetworkServiceKeys.TASKBOARD_SSE,
+            "Task Board SSE Stream",
+            "HTTP/SSE",
+            "localhost:" + serverPort + "/api/tasks/stream",
+            "Demonstrates multithreaded task board updates"
+        );
+        networkServiceRegistry.serviceRunning(
+            NetworkServiceKeys.TASKBOARD_SSE,
+            "Awaiting SSE subscribers on port " + serverPort
+        );
     }
 
     @PostMapping
@@ -31,8 +57,27 @@ public class TaskController {
             @RequestParam(required = false) String description,
             @RequestParam String createdBy,
             @RequestParam(required = false) String assignee) {
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        log.info("📥 [CONTROLLER] TaskController.createTask() - HTTP POST /api/tasks");
+        log.info("   → Service Flow: TaskController → TaskService → SSE Broadcast");
+        log.info("   → Parameters: title={}, createdBy={}, assignee={}", title, createdBy, assignee);
+        log.info("   → [SERVICE] Calling TaskService.createTask()");
+        
         TaskEntity task = taskService.createTask(title, description, createdBy, assignee);
+        log.info("📋 TASK CREATED: #{} '{}' by {} (Status: {}, Assignee: {})", 
+            task.getId(), task.getTitle(), task.getCreatedBy(), task.getStatus(), 
+            task.getAssignee() != null ? task.getAssignee() : "Unassigned");
+        
+        log.info("   → [SERVICE] Broadcasting task update via SSE");
         broadcastToSseClients(task);
+        networkServiceRegistry.recordUsage(
+            NetworkServiceKeys.TASKBOARD_SSE,
+            "TASK-CREATE",
+            String.format("Task #%d broadcast on thread %s", task.getId(), Thread.currentThread().getName())
+        );
+        
+        log.info("✅ [CONTROLLER] TaskController.createTask() - Request completed");
+        log.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -60,7 +105,20 @@ public class TaskController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String assignee) {
         try {
+            TaskEntity oldTask = taskService.getTaskById(id);
             TaskEntity task = taskService.updateTask(id, title, description, status, assignee);
+            
+            // Log status changes prominently
+            if (status != null && !status.equals(oldTask.getStatus())) {
+                log.info("🔄 TASK MOVED: #{} '{}' from {} → {} (Assignee: {})", 
+                    task.getId(), task.getTitle(), oldTask.getStatus(), task.getStatus(),
+                    task.getAssignee() != null ? task.getAssignee() : "Unassigned");
+            } else {
+                log.info("✏️  TASK UPDATED: #{} '{}' (Status: {}, Assignee: {})", 
+                    task.getId(), task.getTitle(), task.getStatus(),
+                    task.getAssignee() != null ? task.getAssignee() : "Unassigned");
+            }
+            
             broadcastToSseClients(task);
             return ResponseEntity.ok(task);
         } catch (IllegalArgumentException e) {
@@ -71,7 +129,9 @@ public class TaskController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         try {
+            TaskEntity task = taskService.getTaskById(id);
             taskService.deleteTask(id);
+            log.info("🗑️  TASK DELETED: #{} '{}'", id, task.getTitle());
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -86,6 +146,12 @@ public class TaskController {
         emitter.onCompletion(() -> sseEmitters.remove(emitter));
         emitter.onTimeout(() -> sseEmitters.remove(emitter));
         emitter.onError((ex) -> sseEmitters.remove(emitter));
+
+        networkServiceRegistry.recordUsage(
+            NetworkServiceKeys.TASKBOARD_SSE,
+            "SUBSCRIBE",
+            String.format("Emitter registered on %s (total: %d)", Thread.currentThread().getName(), sseEmitters.size())
+        );
 
         // Send existing tasks
         try {
@@ -103,6 +169,12 @@ public class TaskController {
     }
 
     private void broadcastToSseClients(TaskEntity task) {
+        int targetClients = sseEmitters.size();
+        networkServiceRegistry.recordUsage(
+            NetworkServiceKeys.TASKBOARD_SSE,
+            "BROADCAST",
+            String.format("Task #%d sent to %d SSE clients via %s", task.getId(), targetClients, Thread.currentThread().getName())
+        );
         sseEmitters.removeIf(emitter -> {
             try {
                 emitter.send(SseEmitter.event()
@@ -115,4 +187,7 @@ public class TaskController {
         });
     }
 }
+
+
+
 

@@ -17,18 +17,28 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
 import java.util.Arrays;
+import java.util.Scanner;
 
 /**
- * Placeholder CLI to connect to the secure chat server via TLS.
+ * TLS chat client CLI to connect to the secure chat server.
+ * 
+ * Usage:
+ *   java -cp ... SecureChatCli --host=localhost --port=9443 --user=alice [--truststore=path] [--storepass=password]
+ * 
+ * Commands:
+ *   USER <username> - Identify yourself
+ *   MSG <text>      - Send a message
+ *   QUIT            - Disconnect
  */
 public class SecureChatCli {
     private static final Logger log = LoggerFactory.getLogger(SecureChatCli.class);
+    private static final String DEFAULT_TRUSTSTORE_CLASSPATH = "certs/server-keystore.jks";
 
     public static void main(String[] args) throws IOException {
         String host = "localhost";
         int port = 9443;
         String truststoreLocation = null;
-        String truststoreType = "PKCS12";
+        String truststoreType = "JKS";
         char[] password = "changeit".toCharArray();
         String user = "guest";
 
@@ -50,18 +60,69 @@ public class SecureChatCli {
         }
 
         SSLSocketFactory factory = createSocketFactory(truststoreLocation, password.clone(), truststoreType);
+        Arrays.fill(password, '\0');
+
         try (SSLSocket socket = (SSLSocket) factory.createSocket(host, port);
              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
+             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+             Scanner scanner = new Scanner(System.in)) {
+            
             socket.startHandshake();
             log.info("Connected to secure chat at {}:{}", host, port);
+            
+            // Start a thread to read server responses
+            Thread readerThread = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println("[Server] " + line);
+                        if (line.equals("BYE")) {
+                            break;
+                        }
+                    }
+                } catch (IOException e) {
+                    if (!socket.isClosed()) {
+                        log.error("Error reading from server", e);
+                    }
+                }
+            });
+            readerThread.setDaemon(true);
+            readerThread.start();
+            
+            // Read welcome message
             String greeting = reader.readLine();
             if (greeting != null) {
-                log.info("Server says: {}", greeting);
+                System.out.println("[Server] " + greeting);
             }
-            writer.write("HELLO " + user);
+            
+            // Send USER command
+            writer.write("USER " + user);
             writer.newLine();
             writer.flush();
+            
+            // Interactive loop
+            System.out.println("Type commands (USER <name>, MSG <text>, QUIT):");
+            while (true) {
+                if (!scanner.hasNextLine()) {
+                    break;
+                }
+                String input = scanner.nextLine().trim();
+                
+                if (input.isEmpty()) {
+                    continue;
+                }
+                
+                if (input.equalsIgnoreCase("quit") || input.equalsIgnoreCase("exit")) {
+                    writer.write("QUIT");
+                    writer.newLine();
+                    writer.flush();
+                    break;
+                }
+                
+                writer.write(input);
+                writer.newLine();
+                writer.flush();
+            }
         } finally {
             Arrays.fill(password, '\0');
         }
@@ -69,6 +130,11 @@ public class SecureChatCli {
 
     private static SSLSocketFactory createSocketFactory(String truststoreLocation, char[] password, String truststoreType) {
         if (truststoreLocation == null) {
+            SSLSocketFactory fromClasspath = loadFromClasspath(password, truststoreType);
+            if (fromClasspath != null) {
+                return fromClasspath;
+            }
+            log.warn("No explicit truststore provided and classpath resource {} not found; falling back to JVM defaults", DEFAULT_TRUSTSTORE_CLASSPATH);
             return (SSLSocketFactory) SSLSocketFactory.getDefault();
         }
 
@@ -78,15 +144,33 @@ public class SecureChatCli {
         }
 
         try (InputStream in = Files.newInputStream(path)) {
+            return buildSocketFactory(in, password, truststoreType);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to initialise SSL context from truststore " + truststoreLocation, e);
+        }
+    }
+
+    private static SSLSocketFactory loadFromClasspath(char[] password, String truststoreType) {
+        try (InputStream in = SecureChatCli.class.getClassLoader().getResourceAsStream(DEFAULT_TRUSTSTORE_CLASSPATH)) {
+            if (in == null) {
+                return null;
+            }
+            log.info("Loading TLS truststore from classpath: {}", DEFAULT_TRUSTSTORE_CLASSPATH);
+            return buildSocketFactory(in, password, truststoreType);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to initialise SSL context from classpath truststore " + DEFAULT_TRUSTSTORE_CLASSPATH, e);
+        }
+    }
+
+    private static SSLSocketFactory buildSocketFactory(InputStream truststoreStream, char[] password, String truststoreType) throws Exception {
+        try {
             KeyStore trustStore = KeyStore.getInstance(truststoreType);
-            trustStore.load(in, password);
+            trustStore.load(truststoreStream, password);
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(trustStore);
             SSLContext context = SSLContext.getInstance("TLS");
             context.init(null, tmf.getTrustManagers(), null);
             return context.getSocketFactory();
-        } catch (Exception e) {
-            throw new IllegalStateException("Unable to initialise SSL context from truststore", e);
         } finally {
             Arrays.fill(password, '\0');
         }

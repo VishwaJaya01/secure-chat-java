@@ -39,20 +39,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (created_by) REFERENCES chat_users(user_id)
 );
 
--- Files metadata
-CREATE TABLE IF NOT EXISTS files (
-    id IDENTITY PRIMARY KEY,
-    filename VARCHAR(255) NOT NULL,
-    original_filename VARCHAR(255) NOT NULL,
-    content_type VARCHAR(100),
-    file_size BIGINT NOT NULL,
-    uploader VARCHAR(64) NOT NULL,
-    checksum VARCHAR(64),
-    file_path VARCHAR(512),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (uploader) REFERENCES chat_users(user_id)
-);
-
 -- Link previews cache
 CREATE TABLE IF NOT EXISTS link_previews (
     id IDENTITY PRIMARY KEY,
@@ -68,4 +54,7 @@ CREATE TABLE IF NOT EXISTS link_previews (
 INSERT INTO chat_users (user_id, display_name, is_admin) 
 SELECT 'admin', 'Administrator', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM chat_users WHERE user_id = 'admin');
+
+
+
 

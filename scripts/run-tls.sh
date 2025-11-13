@@ -12,4 +12,4 @@ then
   exit 1
 fi
 
-( cd "${PROJECT_ROOT}" && mvn -pl chat-secure -am exec:java -Dexec.mainClass=com.securechat.secure.SecureChatServer -Dexec.args="9443" )
+( cd "${PROJECT_ROOT}" && mvn -pl chat-secure -am -Dexec.args="--port=9443 --keystore=classpath:certs/server-keystore.jks" exec:java )
