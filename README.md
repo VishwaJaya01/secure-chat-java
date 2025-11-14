@@ -90,7 +90,7 @@ The frontend will be available at `http://localhost:5173`
 To demo each network service in its own terminal, stay at the project root and use the pre-wired `exec:java` targets:
 
 ```bash
-# TLS chat server (port 9443 by default)
+# TLS chat server (port 9543 by default; auto-increments if taken)
 mvn -pl chat-secure -am exec:java
 
 # TLS chat CLI (override the main class + args as needed)
@@ -259,6 +259,7 @@ cd web-api
 - TLS file server on port 6443
 - TLS announcement gateway (optional)
 - Embedded TLS chat server can be disabled with `tls.chat.embedded=false` when you want to showcase the standalone `chat-secure` process.
+- The standalone TLS server auto-selects the next free port if 9543 is busy. Make sure `tls.chat.port` in web-api matches the printed port (override via `-Dtls.chat.port=...` when launching Spring Boot).
 - HTTPS API on port 8443
 - Keystores/truststores management
 - Cipher/handshake policy

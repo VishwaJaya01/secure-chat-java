@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -21,7 +23,7 @@ public final class SecureChatServerMain {
     }
 
     public static void main(String[] args) throws IOException {
-        int port = 9443;
+        int port = 9543;
         String keystoreLocation = "classpath:certs/server-keystore.jks";
         char[] password = "changeit".toCharArray();
 
@@ -35,6 +37,8 @@ public final class SecureChatServerMain {
                 password = arg.substring("--storepass=".length()).toCharArray();
             }
         }
+
+        port = ensureAvailablePort(port);
 
         byte[] keystoreBytes = loadKeystoreBytes(keystoreLocation);
         SecureChatServer server = new SecureChatServer(
@@ -80,5 +84,22 @@ public final class SecureChatServerMain {
 
     private static void logInboundMessage(Message message) {
         log.info("💬 [{}] {}", message.getFrom(), message.getContent());
+    }
+
+    private static int ensureAvailablePort(int desiredPort) throws IOException {
+        int port = desiredPort;
+        for (int attempts = 0; attempts < 50; attempts++, port++) {
+            try (ServerSocket socket = new ServerSocket()) {
+                socket.setReuseAddress(true);
+                socket.bind(new InetSocketAddress(port));
+                if (port != desiredPort) {
+                    log.warn("Port {} already in use. Using {} instead.", desiredPort, port);
+                }
+                return port;
+            } catch (IOException e) {
+                // try next port
+            }
+        }
+        throw new IOException("Unable to find an available port starting from " + desiredPort);
     }
 }
